@@ -1,0 +1,89 @@
+module menu
+
+import ref
+import src/renderer
+import src/maploader
+
+
+extern type Node
+extern type File
+extern type Canvas
+extern type Ctx2D
+
+extern def getElementById(id: String) at io: Node =
+  jsWeb "(document.getElementById(${id}))"
+
+extern def createElement(tag: String) at io: Node =
+  jsWeb "document.createElement(${tag})"
+
+extern def appendChild(parent: Node, child: Node) at io: Unit =
+  jsWeb "${parent}.appendChild(${child})"
+
+extern def setHTML(node: Node, html: String) at io: Unit =
+  jsWeb "${node}.innerHTML = ${html}"
+
+extern def readFileAsText(file: File) at io: String =
+  jsWeb "await(${file}.text())"
+
+extern def jsOpenFile(node: Node) at io: Unit =
+  jsWeb "${node}.click()"
+
+
+extern def getCanvas(id: String) at io: Canvas =
+  jsWeb "(document.getElementById(${id}))"
+
+extern def getContext(canvas: Canvas) at io: Ctx2D =
+  jsWeb "${canvas}.getContext('2d')"
+
+
+type MenuState { 
+          Menu() 
+          ShowingMap(map: GameMap)
+          Quit() 
+          }
+
+def runMenu(canvasId: String): Unit = {
+  val canvas = getCanvas(canvasId)
+  val ctx = getContext(canvas)
+  val state = ref[MenuState](Menu())
+
+  def render(): Unit = {
+  val s = state.get()
+
+  if (s is Menu()) {
+    ctx.clearScreen
+
+  } else if (s is ShowingMap(m)) {
+    drawMap(ctx, m)
+
+  } else if (s is Quit()) {
+    ctx.clearScreen
+  }
+}
+
+
+  render()
+
+  val ui = getElementById("app")
+  ui.setHTML("")
+
+  // Hidden file selector
+  val fileInput = createElement("input")
+  jsWeb("${fileInput}.type='file'")
+  appendChild(ui, fileInput)
+
+  val btnLoad = createElement("button")
+  setHTML(btnLoad, "Load Map")
+  appendChild(ui, btnLoad)
+
+  // Open dialog
+  onClick(btnLoad, box { jsOpenFile(fileInput) })
+
+  // File selected
+  onFileSelected(fileInput, box { file =>
+    val text = readFileAsText(file)
+    val parsed = parseMap(text)
+    state.set(ShowingMap(parsed))
+    render()
+  })
+}

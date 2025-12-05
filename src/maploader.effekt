@@ -1,0 +1,119 @@
+module maploader
+
+import string
+import list
+
+def rev[A](xs: List[A]): List[A] = reverse(xs)
+
+def extractAt(line: String, pos: Int, key: String): String =
+  line.substring(pos + key.length).trim()
+
+def extract(line: String, key: String): String = {
+  val idx = line.indexOf(key)
+
+
+  val value =
+    match idx {
+      case Some(i) =>
+        extractAt(line, i, key)
+
+      case None =>
+        ""
+    }
+
+  value
+}
+
+
+
+
+type Tile { Floor(); Wall() }
+
+record Unit(side: String, x: Int, y: Int)
+
+record GameMap(
+  width: Int,
+  height: Int,
+  tiles: List[List[Tile]],
+  units: List[Unit]
+)
+
+def parseMap(text: String): GameMap = {
+
+  val rows  = ref[List[List[Tile]]](Nil())
+  val units = ref[List[Unit]](Nil())
+
+  val readingMap   = ref(false)
+  val readingUnits = ref(false)
+
+  val lines = text.split("\n")
+
+  lines.foreach { line =>
+
+    val mapOpen  = line.indexOf("<map>")
+    val mapClose = line.indexOf("</map>")
+
+    val unitsOpen  = line.indexOf("<units>")
+    val unitsClose = line.indexOf("</units>")
+
+    if (mapOpen.isDefined()) readingMap.set(true)
+    else if (mapClose.isDefined()) readingMap.set(false)
+
+    else if (unitsOpen.isDefined()) readingUnits.set(true)
+    else if (unitsClose.isDefined()) readingUnits.set(false)
+
+
+    else if (readingMap.get()) {
+
+  val newRowMarker = line.indexOf("a/")
+
+  if (newRowMarker.isDefined()) {
+    rows.set(Cons(Nil(), rows.get()))
+  } else {
+
+    val curRows = rows.get()
+
+    curRows match {
+      case Nil() =>
+ 
+        val newRow =
+          if (line == "f") Cons(Floor(), Nil())
+          else if (line == "w") Cons(Wall(), Nil())
+          else Nil()
+
+        rows.set(Cons(newRow, curRows))
+
+      case Cons(currentRow, tail) =>
+        val updatedRow =
+          if (line == "f") Cons(Floor(), currentRow)
+          else if (line == "w") Cons(Wall(), currentRow)
+          else currentRow
+
+        rows.set(Cons(updatedRow, tail))
+    }
+  }
+}
+
+
+    else if (readingUnits.get()) {
+  if (line.contains("<unit>")) {
+
+    val side = extract(line, "side:")
+    val xs   = extract(line, "x:")
+    val ys   = extract(line, "y:")
+
+    val x = if (xs == "") 0 else xs.toInt
+    val y = if (ys == "") 0 else ys.toInt
+
+    units.set(Cons(Unit(side, x, y), units.get()))
+  }
+}
+  }
+
+  val mapRows = rev(rows.get()).map(box rev)
+
+  val width  = if (mapRows.isEmpty()) 0 else mapRows.head.length
+  val height = mapRows.length
+
+  GameMap(width, height, mapRows, units.get())
+}
