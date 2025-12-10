@@ -1,6 +1,7 @@
 module renderer
 
 import src/maploader
+import src/model
 
 extern type Ctx2D
 
@@ -24,7 +25,7 @@ extern def drawCircle(ctx: Ctx2D, x: Int, y: Int, r: Int, color: String) at io: 
     ${ctx}.fill();
   """
 
-// Draw map grid
+
 def drawMap(ctx: Ctx2D, map: GameMap): Unit = {
   val tileSize = 40
 
@@ -32,25 +33,27 @@ def drawMap(ctx: Ctx2D, map: GameMap): Unit = {
   map.tiles.foreach { row =>
     var x = 0
     row.foreach { tile =>
-      if (tile is Floor()) {
-  fillRect(ctx, x, y, tileSize, tileSize, "'green'")
-  strokeRect(ctx, x, y, tileSize, tileSize)
-
-} else if (tile is Wall()) {
-  fillRect(ctx, x, y, tileSize, tileSize, "'gray'")
-  strokeRect(ctx, x, y, tileSize, tileSize)
-}
+      if (tile is TileFloor()) {
+        fillRect(ctx, x, y, tileSize, tileSize, "green")
+      } else {
+        fillRect(ctx, x, y, tileSize, tileSize, "gray")
+      }
+      strokeRect(ctx, x, y, tileSize, tileSize)
       x = x + tileSize
     }
     y = y + tileSize
   }
-
+  println("unit count = " ++ show(map.units.size()))
   map.units.foreach { u =>
     val px = u.x * tileSize + tileSize / 2
     val py = u.y * tileSize + tileSize / 2
+
     val color =
-      if (u.side == "player") then "'blue'" else "'red'"
+      if (u.side == "player") "blue"
+      else "red"
 
     drawCircle(ctx, px, py, 12, color)
   }
 }
+
+

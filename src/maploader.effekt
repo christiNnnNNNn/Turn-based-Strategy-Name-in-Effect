@@ -2,6 +2,7 @@ module maploader
 
 import string
 import list
+import src/model
 
 def rev[A](xs: List[A]): List[A] = reverse(xs)
 
@@ -11,37 +12,67 @@ def extractAt(line: String, pos: Int, key: String): String =
 def extract(line: String, key: String): String = {
   val idx = line.indexOf(key)
 
-
-  val value =
-    match idx {
-      case Some(i) =>
-        extractAt(line, i, key)
-
-      case None =>
-        ""
-    }
-
-  value
+  if (idx is Some(i)) {
+    extractAt(line, i, key)
+  } else {
+    ""
+  }
 }
+def between(line: String, start: String, end: String): String = {
+  val s = line.indexOf(start)
+  val e = line.indexOf(end)
+
+  (s, e) match {
+    case (Some(si), Some(ei)) =>
+      line.substring(si + start.length(), ei).trim()
+    case _ =>
+      ""
+  }
+}
+def maxOption(list: List[Int]): Option[Int] =
+  list.foldLeft(None()) { (acc, x) =>
+    acc match {
+      case None() => Some(x)
+      case Some(m) => Some(if (x > m) x else m)
+    }
+  }
+
+def toInt1(s: String): Int =
+  if (s.length() == 0) 0
+  else
+    val first = s.substring(0, 1)   
+    charToDigit(first)
+
+def charToDigit(c: String): Int =
+  if (c == "0") 0
+  else if (c == "1") 1
+  else if (c == "2") 2
+  else if (c == "3") 3
+  else if (c == "4") 4
+  else if (c == "5") 5
+  else if (c == "6") 6
+  else if (c == "7") 7
+  else if (c == "8") 8
+  else if (c == "9") 9
+  else 0
 
 
 
 
-type Tile { Floor(); Wall() }
 
-record Unit(side: String, x: Int, y: Int)
 
-record GameMap(
-  width: Int,
-  height: Int,
-  tiles: List[List[Tile]],
-  units: List[Unit]
-)
+
+
 
 def parseMap(text: String): GameMap = {
+  var height = 0
 
-  val rows  = ref[List[List[Tile]]](Nil())
-  val units = ref[List[Unit]](Nil())
+  val rows   = ref[List[List[Tile]]](Nil())
+  val units  = ref[List[gameUnbit]](Nil())
+
+  val curSide = ref[String]("")
+  val curX    = ref[Int](0)
+  val curY    = ref[Int](0)
 
   val readingMap   = ref(false)
   val readingUnits = ref(false)
@@ -49,71 +80,89 @@ def parseMap(text: String): GameMap = {
   val lines = text.split("\n")
 
   lines.foreach { line =>
+    val trimmed = line.trim()
 
-    val mapOpen  = line.indexOf("<map>")
-    val mapClose = line.indexOf("</map>")
+    val mapOpen    = trimmed.indexOf("<map>")
+    val mapClose   = trimmed.indexOf("</map>")
+    val unitsOpen  = trimmed.indexOf("<units>")
+    val unitsClose = trimmed.indexOf("</units>")
 
-    val unitsOpen  = line.indexOf("<units>")
-    val unitsClose = line.indexOf("</units>")
-
-    if (mapOpen.isDefined()) readingMap.set(true)
-    else if (mapClose.isDefined()) readingMap.set(false)
-
+    if (mapOpen.isDefined())        readingMap.set(true)
+    else if (mapClose.isDefined())  readingMap.set(false)
     else if (unitsOpen.isDefined()) readingUnits.set(true)
     else if (unitsClose.isDefined()) readingUnits.set(false)
 
-
     else if (readingMap.get()) {
+      if (trimmed.length() > 0) {
 
-  val newRowMarker = line.indexOf("a/")
+        val tileText =
+          trimmed.substring(0, trimmed.indexOf("/") match {
+            case Some(idx) => idx
+            case None()    => trimmed.length()
+          })
 
-  if (newRowMarker.isDefined()) {
-    rows.set(Cons(Nil(), rows.get()))
-  } else {
+        var row: List[Tile] = Nil()
+        var i = 0
+        val len = tileText.length()
 
-    val curRows = rows.get()
+        while (i < len) {
+          val ch = tileText.substring(i, i + 1)
 
-    curRows match {
-      case Nil() =>
- 
-        val newRow =
-          if (line == "f") Cons(Floor(), Nil())
-          else if (line == "w") Cons(Wall(), Nil())
-          else Nil()
+          if (ch == "f")      row = Cons(TileFloor(), row)
+          else if (ch == "w") row = Cons(TileWall(), row)
 
-        rows.set(Cons(newRow, curRows))
+          i = i + 1
+        }
 
-      case Cons(currentRow, tail) =>
-        val updatedRow =
-          if (line == "f") Cons(Floor(), currentRow)
-          else if (line == "w") Cons(Wall(), currentRow)
-          else currentRow
-
-        rows.set(Cons(updatedRow, tail))
+        rows.set(Cons(reverse(row), rows.get()))
+        height = height + 1
+      }
     }
-  }
-}
-
 
     else if (readingUnits.get()) {
-  if (line.contains("<unit>")) {
 
-    val side = extract(line, "side:")
-    val xs   = extract(line, "x:")
-    val ys   = extract(line, "y:")
+      if (trimmed.indexOf("<unit>") is Some(_)) {
+        curSide.set("")
+        curX.set(0)
+        curY.set(0)
+      }
 
-    val x = if (xs == "") 0 else xs.toInt
-    val y = if (ys == "") 0 else ys.toInt
+      else if (trimmed.indexOf("</unit>") is Some(_)) {
+        val fx = curX.get() - 1
+        val fy = curY.get() - 1
 
-    units.set(Cons(Unit(side, x, y), units.get()))
+        val internalY = fy
+
+        units.set(Cons(gameUnbit(curSide.get(), fx, internalY), units.get()))
+      }
+
+
+      else {
+        
+        val side = between(trimmed, "<side>", "</side>")
+        if (side.length() > 0) curSide.set(side)
+
+        val xs = extract(trimmed, "<x>")
+        if (xs.length() > 0) curX.set(toInt1(xs))
+
+        val ys = extract(trimmed, "<y>")
+        if (ys.length() > 0) curY.set(toInt1(ys))
+      }
+    }
   }
-}
+
+  var mapRows : List[List[Tile]] = Nil()
+  rows.get().foreach { r =>
+    mapRows = Cons(r, mapRows)
   }
 
-  val mapRows = rev(rows.get()).map(box rev)
+  var w = 0
+  mapRows match {
+    case Cons(firstRow, _) => w = firstRow.size()
+    case Nil()             => w = 0
+  }
 
-  val width  = if (mapRows.isEmpty()) 0 else mapRows.head.length
-  val height = mapRows.length
-
-  GameMap(width, height, mapRows, units.get())
+  GameMap(w, height, mapRows, units.get())
 }
+
+

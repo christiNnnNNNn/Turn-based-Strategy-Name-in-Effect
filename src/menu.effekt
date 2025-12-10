@@ -1,14 +1,16 @@
 module menu
 
 import ref
+import string
 import src/renderer
 import src/maploader
+import src/model
 
 
 extern type Node
-extern type File
 extern type Canvas
-extern type Ctx2D
+
+extern type File
 
 extern def getElementById(id: String) at io: Node =
   jsWeb "(document.getElementById(${id}))"
@@ -19,14 +21,18 @@ extern def createElement(tag: String) at io: Node =
 extern def appendChild(parent: Node, child: Node) at io: Unit =
   jsWeb "${parent}.appendChild(${child})"
 
-extern def setHTML(node: Node, html: String) at io: Unit =
-  jsWeb "${node}.innerHTML = ${html}"
+extern def setHTML(node: Node, txt: String) at io: Unit =
+  jsWeb "${node}.innerHTML = ${txt}"
 
-extern def readFileAsText(file: File) at io: String =
-  jsWeb "await(${file}.text())"
+extern def setStyle(node: Node, css: String) at io: Unit =
+  jsWeb "${node}.style = ${css}"
 
-extern def jsOpenFile(node: Node) at io: Unit =
-  jsWeb "${node}.click()"
+extern def onClick(node: Node, handler: () => Unit at {io, global}) at io: Unit =
+  jsWeb """
+    ${node}.addEventListener('click', () => {
+      $effekt.runToplevel((ks, k) => ${handler}(ks, k));
+    })
+  """
 
 
 extern def getCanvas(id: String) at io: Canvas =
@@ -35,55 +41,131 @@ extern def getCanvas(id: String) at io: Canvas =
 extern def getContext(canvas: Canvas) at io: Ctx2D =
   jsWeb "${canvas}.getContext('2d')"
 
+extern def clearScreen(ctx: Ctx2D) at io: Unit =
+  jsWeb "${ctx}.clearRect(0,0,800,600)"
 
-type MenuState { 
-          Menu() 
-          ShowingMap(map: GameMap)
-          Quit() 
-          }
+extern def drawText(ctx: Ctx2D, text: String, x: Int, y: Int) at io: Unit =
+  jsWeb """
+    ${ctx}.font = '26px monospace';
+    ${ctx}.fillStyle = 'white';
+    ${ctx}.fillText(${text}, ${x}, ${y});
+  """
 
-def runMenu(canvasId: String): Unit = {
-  val canvas = getCanvas(canvasId)
-  val ctx = getContext(canvas)
-  val state = ref[MenuState](Menu())
+extern def setCanvasStyle(canvas: Canvas, css: String) at io: Unit =
+  jsWeb "${canvas}.style = ${css}"
 
-  def render(): Unit = {
-  val s = state.get()
 
-  if (s is Menu()) {
-    ctx.clearScreen
+extern def enableDropTarget(node: Canvas) at io: Unit =
+  jsWeb """
+    ${node}.addEventListener('dragover', ev => ev.preventDefault());
+  """
 
-  } else if (s is ShowingMap(m)) {
-    drawMap(ctx, m)
+extern def onFileDrop(node: Canvas, handler: String => Unit at {io, global}) at io: Unit =
+  jsWeb """
+    ${node}.addEventListener('drop', ev => {
+      ev.preventDefault();
+      const file = ev.dataTransfer.files[0];
+      if (file) {
+        file.text().then(text => {
+          $effekt.runToplevel((ks, k) => ${handler}(text, ks, k));
+        });
+      }
+    });
+  """
+extern def readFileAsText(file: File) at io: String =
+  jsWeb "(${file}.text())"
 
-  } else if (s is Quit()) {
-    ctx.clearScreen
-  }
+
+
+
+extern def fileName(file: File) at io: String =
+  jsWeb "${file}.name"
+
+type MenuState {
+  Menu()
+  MapLoaded(map: GameMap, filename: String)
+  Quit()
 }
 
+def runMenu(canvasId: String): Unit = {
 
-  render()
+  val canvas = getCanvas(canvasId)
+  val ctx    = getContext(canvas)
+
+  setCanvasStyle(canvas, "background:black; border:3px dashed yellow")
+
+  val state = ref[MenuState](Menu())
 
   val ui = getElementById("app")
   ui.setHTML("")
 
-  // Hidden file selector
-  val fileInput = createElement("input")
-  jsWeb("${fileInput}.type='file'")
-  appendChild(ui, fileInput)
+  def makeButton(label: String): Node = {
+    val b = createElement("button")
+    setHTML(b, label)
+    setStyle(b, """
+      display:block;
+      margin: 10px auto;
+      padding: 12px 30px;
+      font-size: 18px;
+      font-family: monospace;
+      background:#333;
+      color:white;
+      border:3px solid white;
+      border-radius:12px;
+      cursor:pointer;
+    """)
+    b
+  }
 
-  val btnLoad = createElement("button")
-  setHTML(btnLoad, "Load Map")
+
+
+  val btnLoad = makeButton("📂 LOAD MAP (drag file to canvas)")
+  val btnQuit = makeButton("✖ QUIT")
+
   appendChild(ui, btnLoad)
+  appendChild(ui, btnQuit)
 
-  // Open dialog
-  onClick(btnLoad, box { jsOpenFile(fileInput) })
 
-  // File selected
-  onFileSelected(fileInput, box { file =>
-    val text = readFileAsText(file)
+  def render(): Unit = {
+    ctx.clearScreen
+    val s = state.get()
+
+    if (s is Menu()) {
+      ctx.drawText("TACTICAL RPG", 260, 120)
+      ctx.drawText("Drop a map file on canvas!", 200, 180)
+      ctx.drawText("Or click LOAD MAP", 240, 220)
+
+    } else if (s is MapLoaded(map,name)) {
+      drawMap(ctx, map)
+
+    } else if (s is Quit()) {
+      ctx.drawText("Goodbye!", 320, 180)
+    }
+  }
+
+
+  enableDropTarget(canvas)
+
+  onFileDrop(canvas, box { text =>
     val parsed = parseMap(text)
-    state.set(ShowingMap(parsed))
+   
+    state.set(MapLoaded(parsed, "dropped.map"))
     render()
   })
+
+
+
+  
+
+  onClick(btnLoad, box {
+    state.set(Menu())   
+    render()
+  })
+
+  onClick(btnQuit, box {
+    state.set(Quit())
+    render()
+  })
+
+  render()
 }

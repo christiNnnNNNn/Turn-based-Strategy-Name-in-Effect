@@ -1,0 +1,12 @@
+module model
+
+type Tile { TileFloor(); TileWall() }
+
+record gameUnbit(side: String, x: Int, y: Int)
+
+record GameMap(
+  width: Int,
+  height: Int,
+  tiles: List[List[Tile]],
+  units: List[gameUnbit]
+)
