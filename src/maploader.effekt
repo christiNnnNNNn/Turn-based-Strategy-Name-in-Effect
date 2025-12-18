@@ -59,6 +59,16 @@ def charToDigit(c: String): Int =
 
 
 
+def parseWeaponType(s: String): WeaponKind =
+  if (s == "axe") Axe()
+  else if (s == "sword") Sword()
+  else if (s == "lance") Lance()
+  else if (s == "bow") Bow()
+  else Tome()
+
+def parseDamageType(s: String): DamageType =
+  if (s == "magical") Magic()
+  else Physical()
 
 
 
@@ -73,10 +83,30 @@ def parseMap(text: String): GameMap = {
   val curSide = ref[String]("")
   val curX    = ref[Int](0)
   val curY    = ref[Int](0)
+  val curHP        = ref[Int](0)
+  val curStrength = ref[Int](0)
+  val curMagic     = ref[Int](0)
+  val curDefense   = ref[Int](0)
+  val curResistance= ref[Int](0)
+  val curPrecision = ref[Int](0)
+  val curAgility   = ref[Int](0)
+  val curLuck      = ref[Int](0)
+  val curMovement  = ref[Int](0)
 
   val readingMap   = ref(false)
   val readingUnits = ref(false)
+  val weapons = ref[List[Weapon]](Nil())
+  val readingWeapons = ref(false)
+  val readingWeapon  = ref(false)
 
+  
+  val wName   = ref[String]("")
+  val wType   = ref[WeaponKind](Axe())
+  val wDmg    = ref[DamageType](Physical())
+  val wAtk    = ref[Int](0)
+  val wHit    = ref[Int](0)
+  val wUses   = ref[Int](0)
+  val wCrit   = ref[Int](0)
   val lines = text.split("\n")
 
   lines.foreach { line =>
@@ -120,20 +150,118 @@ def parseMap(text: String): GameMap = {
     }
 
     else if (readingUnits.get()) {
+      if (trimmed.indexOf("<weapons>") is Some(_))
+  readingWeapons.set(true)
 
+else if (trimmed.indexOf("</weapons>") is Some(_))
+  readingWeapons.set(false)
+
+else if (readingWeapons.get()) {
+
+        if (trimmed.indexOf("<weapon>") is Some(_)) {
+          readingWeapon.set(true)
+
+          wName.set("")
+          wType.set(Axe())
+          wDmg.set(Physical())
+          wAtk.set(0)
+          wHit.set(0)
+          wUses.set(0)
+          wCrit.set(0)
+        }
+
+        else if (trimmed.indexOf("</weapon>") is Some(_)) {
+          weapons.set(
+            Cons(
+              Weapon(
+                wName.get(),
+                wType.get(),
+                wDmg.get(),
+                wAtk.get(),
+                wHit.get(),
+                wUses.get(),
+                wCrit.get(),
+                Nil()
+              ),
+              weapons.get()
+            )
+          )
+          readingWeapon.set(false)
+        }
+
+        else if (readingWeapon.get()) {
+          val n = between(trimmed, "<name>", "</name>")
+          if (n.length() > 0) wName.set(n)
+
+          val t = between(trimmed, "<type>", "</type>")
+          if (t.length() > 0) wType.set(parseWeaponType(t))
+
+          val d = between(trimmed, "<damage>", "</damage>")
+          if (d.length() > 0) wDmg.set(parseDamageType(d))
+
+          val atk = between(trimmed, "<attack>", "</attack>")
+          if (atk.length() > 0) wAtk.set(toInt1(atk))
+
+          val hit = between(trimmed, "<hit>", "</hit>")
+          if (hit.length() > 0) wHit.set(toInt1(hit))
+
+          val uses = between(trimmed, "<uses>", "</uses>")
+          if (uses.length() > 0) wUses.set(toInt1(uses))
+
+          val crit = between(trimmed, "<crit>", "</crit>")
+          if (crit.length() > 0) wCrit.set(toInt1(crit))
+        }
+      }
       if (trimmed.indexOf("<unit>") is Some(_)) {
         curSide.set("")
         curX.set(0)
         curY.set(0)
+        curHP.set(0)
+        curStrength.set(0)
+        curMagic.set(0)
+        curDefense.set(0)
+        curResistance.set(0)
+        curPrecision.set(0)
+        curAgility.set(0)
+        curLuck.set(0)
+        curMovement.set(0)
+        weapons.set(Nil())
       }
 
       else if (trimmed.indexOf("</unit>") is Some(_)) {
         val fx = curX.get() - 1
         val fy = curY.get() - 1
+        readingWeapons.set(false)
+        readingWeapon.set(false)
 
         val internalY = fy
 
-        units.set(Cons(gameUnbit(curSide.get(), fx, internalY), units.get()))
+         units.set(
+          Cons(
+             gameUnbit(
+                  
+              curSide.get(),
+              fx,
+              fy,
+
+              curHP.get(),
+              curStrength.get(),
+              curMagic.get(),
+              curDefense.get(),
+              curResistance.get(),
+              curPrecision.get(),
+              curAgility.get(),
+              curLuck.get(),
+              curMovement.get(),
+
+              reverse(weapons.get()),
+              0
+          )
+
+,
+            units.get()
+          )
+         )
       }
 
 
@@ -142,11 +270,38 @@ def parseMap(text: String): GameMap = {
         val side = between(trimmed, "<side>", "</side>")
         if (side.length() > 0) curSide.set(side)
 
-        val xs = extract(trimmed, "<x>")
+        val xs = between(trimmed, "<x>", "</x>")
         if (xs.length() > 0) curX.set(toInt1(xs))
 
-        val ys = extract(trimmed, "<y>")
+        val ys = between(trimmed, "<y>", "</y>")
         if (ys.length() > 0) curY.set(toInt1(ys))
+
+        val hp = between(trimmed, "<hp>", "</hp>")
+        if (hp.length() > 0) curHP.set(toInt1(hp))
+
+        val str = between(trimmed, "<strength>", "</strength>")
+        if (str.length() > 0) curStrength.set(toInt1(str))
+
+        val mag = between(trimmed, "<magic>", "</magic>")
+        if (mag.length() > 0) curMagic.set(toInt1(mag))
+
+        val deff = between(trimmed, "<defense>", "</defense>")
+        if (deff.length() > 0) curDefense.set(toInt1(deff))
+
+        val res = between(trimmed, "<resistance>", "</resistance>")
+        if (res.length() > 0) curResistance.set(toInt1(res))
+
+        val pre = between(trimmed, "<precision>", "</precision>")
+        if (pre.length() > 0) curPrecision.set(toInt1(pre))
+
+        val agi = between(trimmed, "<agility>", "</agility>")
+        if (agi.length() > 0) curAgility.set(toInt1(agi))
+
+        val luck = between(trimmed, "<luck>", "</luck>")
+        if (luck.length() > 0) curLuck.set(toInt1(luck))
+
+        val mov = between(trimmed, "<movement>", "</movement>")
+        if (mov.length() > 0) curMovement.set(toInt1(mov))
       }
     }
   }

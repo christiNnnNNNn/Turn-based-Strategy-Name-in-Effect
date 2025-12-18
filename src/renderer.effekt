@@ -24,7 +24,13 @@ extern def drawCircle(ctx: Ctx2D, x: Int, y: Int, r: Int, color: String) at io: 
     ${ctx}.arc(${x},${y},${r},0,Math.PI*2);
     ${ctx}.fill();
   """
+def drawUnit(ctx: Ctx2D, u: gameUnbit, color: String): Unit = {
+  val tileSize = 40
+  val cx = u.x * tileSize + tileSize / 2
+  val cy = u.y * tileSize + tileSize / 2
 
+  drawCircle(ctx, cx, cy, 12, color)
+}
 
 def drawMap(ctx: Ctx2D, map: GameMap): Unit = {
   val tileSize = 40
@@ -44,16 +50,7 @@ def drawMap(ctx: Ctx2D, map: GameMap): Unit = {
     y = y + tileSize
   }
   println("unit count = " ++ show(map.units.size()))
-  map.units.foreach { u =>
-    val px = u.x * tileSize + tileSize / 2
-    val py = u.y * tileSize + tileSize / 2
-
-    val color =
-      if (u.side == "player") "blue"
-      else "red"
-
-    drawCircle(ctx, px, py, 12, color)
-  }
+  
 }
 
 

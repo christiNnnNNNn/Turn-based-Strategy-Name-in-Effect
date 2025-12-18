@@ -1,6 +1,6 @@
 module menu
 
-import ref
+
 import string
 import src/renderer
 import src/maploader
@@ -11,6 +11,15 @@ extern type Node
 extern type Canvas
 
 extern type File
+record TilePos(x: Int, y: Int)
+extern type ClickPos
+type UIAction {
+  NoAction()
+  SwitchWeapon(index: Int)
+
+  SelectTile(tx: Int, ty: Int)
+}
+
 
 extern def getElementById(id: String) at io: Node =
   jsWeb "(document.getElementById(${id}))"
@@ -33,6 +42,21 @@ extern def onClick(node: Node, handler: () => Unit at {io, global}) at io: Unit 
       $effekt.runToplevel((ks, k) => ${handler}(ks, k));
     })
   """
+extern def onCanvasClick(
+  canvas: Canvas,
+  handler: ClickPos => Unit at {io, global}
+) at io: Unit =
+  jsWeb """
+    ${canvas}.addEventListener('click', ev => {
+      const rect = ${canvas}.getBoundingClientRect();
+      const x = ev.clientX - rect.left;
+      const y = ev.clientY - rect.top;
+      $effekt.runToplevel((ks, k) =>
+        ${handler}({ x: x, y: y }, ks, k)
+      );
+    });
+  """
+
 
 
 extern def getCanvas(id: String) at io: Canvas =
@@ -75,6 +99,11 @@ extern def onFileDrop(node: Canvas, handler: String => Unit at {io, global}) at 
 extern def readFileAsText(file: File) at io: String =
   jsWeb "(${file}.text())"
 
+extern def clickX(pos: ClickPos) at io: Int =
+  jsWeb "${pos}.x"
+
+extern def clickY(pos: ClickPos) at io: Int =
+  jsWeb "${pos}.y"
 
 
 
@@ -87,18 +116,161 @@ type MenuState {
   Quit()
 }
 
-def runMenu(canvasId: String): Unit = {
 
+
+
+val tileSize = 40
+
+
+
+def unitAt(
+  units: List[gameUnbit],
+  tx: Int,
+  ty: Int
+): Option[gameUnbit] =
+  units match {
+    case Nil() =>
+      None()
+
+    case Cons(u, rest) =>
+      if (u.x == tx && u.y == ty)
+        Some(u)
+      else
+        unitAt(rest, tx, ty)
+  }
+
+
+def weaponKindToString(k: WeaponKind): String =
+  k match {
+    case Axe()   => "Axe"
+    case Sword() => "Sword"
+    case Lance() => "Lance"
+    case Bow()   => "Bow"
+    case Tome()  => "Tome"
+  }
+def damageTypeToString(d: DamageType): String =
+  d match {
+    case Physical() => "Physical"
+    case Magic()    => "Magic"
+  }
+def weaponsToHTML(
+  ws: List[Weapon],
+  active: Int
+): String = {
+
+  def loop(ws: List[Weapon], i: Int): String =
+    ws match {
+      case Nil() => ""
+      case Cons(w, rest) =>
+        val marker =
+          if (i == active) "▶ " else ""
+
+        marker ++ w.name ++ "<br/>" ++ loop(rest, i + 1)
+    }
+
+  loop(ws, 0)
+}
+
+
+
+def activeWeaponInfo(u: gameUnbit): String =
+  getActiveWeapon(u) match {
+    case None() =>
+      "<i>No active weapon</i>"
+
+    case Some(w) =>
+      "<b>ACTIVE WEAPON</b><br/>" ++
+      "Name: " ++ w.name ++ "<br/>" ++
+      "Type: " ++ weaponKindToString(w.kind) ++ "<br/>" ++
+      "Damage: " ++ damageTypeToString(w.damageType) ++ "<br/>" ++
+      "ATK: " ++ show(w.attack) ++ "<br/>" ++
+      "HIT: " ++ show(w.hit) ++ "%<br/>" ++
+      "CRIT: " ++ show(w.crit) ++ "%<br/>" ++
+      "Uses: " ++ show(w.uses)
+  }
+
+
+def canSwitchWeapon(u: gameUnbit): Bool =
+  u.side == "player"
+
+
+def switchWeapon(u: gameUnbit, newIndex: Int): gameUnbit = {
+  def weaponCount(ws: List[Weapon]): Int =
+    ws match {
+      case Nil() => 0
+      case Cons(_, rest) => 1 + weaponCount(rest)
+    }
+
+  val count = weaponCount(u.weapons)
+
+  if (
+    canSwitchWeapon(u) &&
+    newIndex >= 0 &&
+    newIndex < count
+  )
+    gameUnbit(
+      u.side,
+      u.x,
+      u.y,
+      u.hp,
+      u.strength,
+      u.magic,
+      u.defense,
+      u.resistance,
+      u.precision,
+      u.agility,
+      u.luck,
+      u.movement,
+      u.weapons,
+      newIndex
+    )
+  else
+    u
+}
+
+
+
+
+def replaceUnit(
+  units: List[gameUnbit],
+  updated: gameUnbit
+): List[gameUnbit] =
+  units match {
+    case Nil() => Nil()
+    case Cons(u, rest) =>
+      if (u.x == updated.x && u.y == updated.y)
+        Cons(updated, rest)
+      else
+        Cons(u, replaceUnit(rest, updated))
+  }
+
+
+
+def runMenu(canvasId: String): Unit = {
+  val selectedUnit = ref(None())
+  val statPanel = createElement("div")
   val canvas = getCanvas(canvasId)
+  val currentMap   = ref(None())
+  val weaponPanel = createElement("div")
   val ctx    = getContext(canvas)
+  def debugUnit(prefix: String, u: gameUnbit): Unit = {
+    println(prefix ++
+      " side=" ++ u.side ++
+      " pos=(" ++ show(u.x) ++ "," ++ show(u.y) ++ ")" ++
+      " activeWeapon=" ++ show(u.activeWeapon)
+    )
+  }
+
+  def debugSelected(prefix: String): Unit =
+    selectedUnit.get() match {
+      case None() => println(prefix ++ " selectedUnit=None")
+      case Some(u) => debugUnit(prefix ++ " selectedUnit=Some", u)
+    }
 
   setCanvasStyle(canvas, "background:black; border:3px dashed yellow")
-
   val state = ref[MenuState](Menu())
-
   val ui = getElementById("app")
   ui.setHTML("")
-
   def makeButton(label: String): Node = {
     val b = createElement("button")
     setHTML(b, label)
@@ -116,56 +288,305 @@ def runMenu(canvasId: String): Unit = {
     """)
     b
   }
+  setStyle(weaponPanel, """
+  position:absolute;
+  right:10px;
+  top:280px;
+  width:240px;
+  padding:12px;
+  background:#222;
+  color:white;
+  font-family:monospace;
+  border:2px solid white;
+  """)
+
+  appendChild(ui, weaponPanel)
+
+    val btnLoad = makeButton(" LOAD MAP (drag file to canvas)")
+    val btnQuit = makeButton(" QUIT")
+
+    appendChild(ui, btnLoad)
+    appendChild(ui, btnQuit)
+    
+
+    def drawMenu(ctx: Ctx2D): Unit = {
+    ctx.drawText("TACTICAL RPG", 260, 120)
+    ctx.drawText("Drop a map file on canvas!", 200, 180)
+    ctx.drawText("Or click LOAD MAP", 240, 220)
+  }
+
+  def drawQuit(ctx: Ctx2D): Unit = {
+    ctx.drawText("Goodbye!", 320, 180)
+  }
+  def apply(action: UIAction): Unit =
+    action match {
+      case SwitchWeapon(i) =>
+      println("APPLY SwitchWeapon i=" ++ show(i))
+        selectedUnit.get() match {
+          case Some(u) =>
+           println("side = " ++ u.side)
+          println("canSwitch = " ++ show(canSwitchWeapon(u)))
+            if (canSwitchWeapon(u)) {
+              currentMap.get() match {
+                case Some(m) =>
+                  val updated = switchWeapon(u, i)
+                  debugUnit("OLD:", u)
+                  debugUnit("UPDATED:", updated)
+                  currentMap.set(
+                    Some(
+                      GameMap(
+                        m.width,
+                        m.height,
+                        m.tiles,
+                        replaceUnit(m.units, updated)
+                      )
+                    )
+                  )
+                  currentMap.get() match {
+                    case Some(m2) =>
+                      unitAt(m2.units, updated.x, updated.y) match {
+                        case None() =>
+                          println("ERROR: updated unit not found in new map!")
+                        case Some(u2) =>
+                          debugUnit("MAP READBACK:", u2)
+                      }
+                    case None() => println("ERROR: currentMap became None after set?")
+                  }
+                  selectedUnit.set(Some(updated))
+                  debugSelected("AFTER selectedUnit.set:")
+                case None() => ()
+              }
+            } else {
+              ()
+            }
+
+          case None() => ()
+        }
+
+      case SelectTile(tx, ty) =>
+      println("APPLY SelectTile (" ++ show(tx) ++ "," ++ show(ty) ++ ")")
+  debugSelected("Before SelectTile overwrite check:")
+  (selectedUnit.get(), currentMap.get()) match {
+    case (Some(sel), Some(m)) =>
+      if (sel.x == tx && sel.y == ty)
+        () // keep current selectedUnit
+      else
+        selectedUnit.set(unitAt(m.units, tx, ty))
+
+    case (_, Some(m)) =>
+      selectedUnit.set(unitAt(m.units, tx, ty))
+
+    case _ =>
+      selectedUnit.set(None())
+    debugSelected("After SelectTile:")
+  }
+
+        
+      case NoAction() => ()
+    }
 
 
 
-  val btnLoad = makeButton("📂 LOAD MAP (drag file to canvas)")
-  val btnQuit = makeButton("✖ QUIT")
-
-  appendChild(ui, btnLoad)
-  appendChild(ui, btnQuit)
 
 
-  def render(): Unit = {
-    ctx.clearScreen
-    val s = state.get()
+ def renderStats(): Unit =
+  selectedUnit.get() match {
+    case None() =>
+      statPanel.setHTML("<i>No unit selected</i>")
 
-    if (s is Menu()) {
-      ctx.drawText("TACTICAL RPG", 260, 120)
-      ctx.drawText("Drop a map file on canvas!", 200, 180)
-      ctx.drawText("Or click LOAD MAP", 240, 220)
+    case Some(u) =>
+      statPanel.setHTML(
+        """
+        <b>UNIT STATS</b><br/>
+        Side: """ ++ u.side ++ """<br/><br/>
+        HP: """ ++ show(u.hp) ++ """<br/>
+        STR: """ ++ show(u.strength) ++ """<br/>
+        MAG: """ ++ show(u.magic) ++ """<br/>
+        DEF: """ ++ show(u.defense) ++ """<br/>
+        RES: """ ++ show(u.resistance) ++ """<br/>
+        PRE: """ ++ show(u.precision) ++ """<br/>
+        AGI: """ ++ show(u.agility) ++ """<br/>
+        LUCK: """ ++ show(u.luck) ++ """<br/>
+        MOV: """ ++ show(u.movement)
+      )
+  }
+  
 
-    } else if (s is MapLoaded(map,name)) {
-      drawMap(ctx, map)
 
-    } else if (s is Quit()) {
-      ctx.drawText("Goodbye!", 320, 180)
+
+
+
+
+
+ 
+
+
+  def renderUi(): Unit = {
+    ctx.clearScreen()
+   def makeWeaponButton(
+  u: gameUnbit,
+  w: Weapon,
+  idx: Int
+): Unit = {
+  val btn = createElement("button")
+
+  // embed index into DOM
+  setHTML(
+    btn,
+    (if (idx == u.activeWeapon) "▶ " else "") ++
+    w.name ++
+    " [#" ++ show(idx) ++ "]"
+  )
+
+  onClick(btn, box {
+    // parse index back out
+    apply(SwitchWeapon(idx))
+    renderUi()
+  })
+
+  appendChild(weaponPanel, btn)
+}
+
+
+
+    
+   def renderWeapons(u: gameUnbit): Unit = {
+  weaponPanel.setHTML("")
+
+  def loop(ws: List[Weapon], idxs: List[Int]): Unit =
+    (ws, idxs) match {
+      case (Nil(), _) => ()
+      case (_, Nil()) => ()
+      case (Cons(w, wsRest), Cons(i, idxRest)) =>
+        makeWeaponButton(u, w, i)
+        loop(wsRest, idxRest)
+    }
+
+  loop(u.weapons, Cons(0, Cons(1, Cons(2, Nil()))))
+  val sep = createElement("hr")
+  appendChild(weaponPanel, sep)
+
+  // ---- active weapon stats ----
+  val info = createElement("div")
+  setHTML(info, activeWeaponInfo(u))
+  appendChild(weaponPanel, info)
+}
+
+
+    // ----- main render -----
+    state.get() match {
+
+      case MapLoaded(_, _) =>
+        currentMap.get() match {
+          case Some(m) =>
+            drawMap(ctx, m)
+
+            m.units.foreach { u =>
+              val baseColor =
+                if (u.side == "player") "blue" else "red"
+
+              val color =
+                selectedUnit.get() match {
+                  case Some(sel) =>
+                    if (sel.x == u.x && sel.y == u.y) "yellow"
+                    else baseColor
+                  case None() =>
+                    baseColor
+                }
+
+              drawUnit(ctx, u, color)
+            }
+
+            renderStats()
+
+            selectedUnit.get() match {
+              case Some(u) => 
+                debugUnit("renderWeapons called with:", u)
+                renderWeapons(u)
+              case None()  =>
+                weaponPanel.setHTML("<i>No unit selected</i>")
+            }
+
+          case None() => ()
+        }
+
+      case Menu() =>
+        drawMenu(ctx)
+
+      case Quit() =>
+        drawQuit(ctx)
     }
   }
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+  
+  
+  def getActiveWeapon(u: gameUnbit): Option[Weapon] = {
+  def loop(ws: List[Weapon], idx: Int): Option[Weapon] =
+    ws match {
+      case Nil() => None()
+      case Cons(w, rest) =>
+        if (idx == 0) Some(w)
+        else loop(rest, idx - 1)
+    }
+
+  if (u.activeWeapon < 0) None()
+  else loop(u.weapons, u.activeWeapon)
+}
 
 
   enableDropTarget(canvas)
 
   onFileDrop(canvas, box { text =>
-    val parsed = parseMap(text)
-   
-    state.set(MapLoaded(parsed, "dropped.map"))
-    render()
-  })
+  val parsed = parseMap(text)
+  currentMap.set(Some(parsed))
+  state.set(MapLoaded(parsed, "dropped.map"))
+  renderUi()
+})
+
 
 
 
   
-
-  onClick(btnLoad, box {
-    state.set(Menu())   
-    render()
-  })
-
   onClick(btnQuit, box {
     state.set(Quit())
-    render()
+    renderUi()
   })
+  onCanvasClick(canvas, box { pos =>
+  apply(SelectTile(
+    clickX(pos) / tileSize,
+    clickY(pos) / tileSize
+  ))
+  renderUi()
+})
 
-  render()
+  setStyle(statPanel, """
+    position:absolute;
+    right:10px;
+    top:10px;
+    width:240px;
+    padding:12px;
+    background:#222;
+    color:white;
+    font-family:monospace;
+    border:2px solid white;
+  """)
+  appendChild(ui, statPanel)
+
 }

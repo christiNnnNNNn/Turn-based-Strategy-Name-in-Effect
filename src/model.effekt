@@ -2,7 +2,35 @@ module model
 
 type Tile { TileFloor(); TileWall() }
 
-record gameUnbit(side: String, x: Int, y: Int)
+record gameUnbit(
+  
+  side: String,        // "player" or "enemy"
+
+  x: Int,              // tile X position
+  y: Int,              // tile Y position
+
+  // --- Core stats ---
+  hp: Int,             // Hit Points: how much damage the unit can take before dying
+
+  strength: Int,       // Physical attack power (used for melee / physical damage)
+  magic: Int,          // Magical attack power (used for spells and magic skills)
+
+  defense: Int,        // Physical defense: reduces incoming physical damage
+  resistance: Int,     // Magical defense: reduces incoming magic damage
+
+  precision: Int,      // Accuracy: increases chance to hit enemies
+  agility: Int,        // Evasion: decreases chance to be hit by enemies
+  luck: Int,           // Luck: affects crit chance and crit avoidance
+
+  movement: Int,       // Movement range per turn
+
+  // --- Weapons ---
+  weapons: List[Weapon], // All weapons the unit carries
+  activeWeapon: Int      // Index into weapons list (0-based)
+)
+
+
+
 
 record GameMap(
   width: Int,
@@ -10,3 +38,48 @@ record GameMap(
   tiles: List[List[Tile]],
   units: List[gameUnbit]
 )
+// --- Weapon categories (for matchup rules later)
+type WeaponKind {
+  Sword()
+  Axe()
+  Lance()
+  Bow()
+  Tome()
+}
+
+// --- Is damage physical or magical?
+type DamageType {
+  Physical()
+  Magic()
+}
+
+// --- Special effects that can be attached to weapons
+type WeaponMod {
+  NoneMod()
+  Poison(chance: Int)      // percent chance
+  Burn(chance: Int)
+  ArmorBreak(amount: Int)  // flat defense reduction
+}
+
+// --- Weapon record
+record Weapon(
+  name: String,
+  kind: WeaponKind,
+  damageType: DamageType,
+  attack: Int,
+  hit: Int,        // percent 0..100
+  uses: Int,       // remaining uses
+  crit: Int,       // percent 0..100
+  mods: List[WeaponMod]
+)
+def getActiveWeapon(u: gameUnbit): Option[Weapon] = {
+  def loop(ws: List[Weapon], i: Int): Option[Weapon] =
+    ws match {
+      case Nil() => None()
+      case Cons(w, rest) =>
+        if (i == 0) Some(w)
+        else loop(rest, i - 1)
+    }
+
+  loop(u.weapons, u.activeWeapon)
+}
