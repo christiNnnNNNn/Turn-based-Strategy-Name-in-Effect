@@ -1,0 +1,260 @@
+
+import src/model
+effect canEnter(x: Int, y: Int): Bool
+effect moveCost(x: Int, y: Int): Int
+effect isOccupied(x: Int, y: Int): Bool
+record TilePos(x: Int, y: Int)
+record Reach(
+  x: Int,
+  y: Int,
+  remaining: Int
+)
+def listGet[A](xs: List[A], i: Int): Option[A] =
+  if (i < 0) None()
+  else xs match {
+    case Nil() => None()
+    case Cons(x, rest) =>
+      if (i == 0) Some(x)
+      else listGet(rest, i - 1)
+  }
+
+
+
+def tileAt(map: GameMap, x: Int, y: Int): Tile =
+  listGet(map.tiles, y) match {
+    case None() =>
+      TileWall()
+
+    case Some(row) =>
+      listGet(row, x) match {
+        case None() => TileWall()
+        case Some(t) => t
+      }
+  }
+
+
+ 
+def tryMove(
+  x: Int,
+  y: Int,
+  remaining: Int
+): Int / { canEnter, moveCost } = {
+  if (do canEnter(x, y)) {
+    remaining - do moveCost(x, y)
+  } else {
+    remaining
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def betterSeen(
+  seen: List[(TilePos, Int)],
+  x: Int,
+  y: Int,
+  remaining: Int
+): Bool =
+  seen match {
+    case Nil() => false
+    case Cons((TilePos(px, py), r), rest) =>
+      if (px == x && py == y && r >= remaining)
+        true
+      else
+        betterSeen(rest, x, y, remaining)
+  }
+def updateSeen(
+  seen: List[(TilePos, Int)],
+  x: Int,
+  y: Int,
+  remaining: Int
+): List[(TilePos, Int)] =
+  seen match {
+    case Nil() =>
+      Cons((TilePos(x, y), remaining), Nil())
+
+    case Cons((TilePos(px, py), r), rest) =>
+      if (px == x && py == y) {
+        if (remaining > r)
+          Cons((TilePos(x, y), remaining), rest)
+        else
+          seen
+      } else
+        Cons((TilePos(px, py), r), updateSeen(rest, x, y, remaining))
+  }
+
+def neighbors(r: Reach): List[Reach] =
+  Cons(Reach(r.x + 1, r.y, r.remaining),
+  Cons(Reach(r.x - 1, r.y, r.remaining),
+  Cons(Reach(r.x, r.y + 1, r.remaining),
+  Cons(Reach(r.x, r.y - 1, r.remaining),
+       Nil()))))
+def expand(
+  frontier: List[Reach],
+  seen: List[(TilePos, Int)],
+  reachable: List[TilePos]
+): List[TilePos] / { canEnter, moveCost } =
+
+  frontier match {
+
+    case Nil() =>
+      reachable
+
+    case Cons(r, rest) => {
+
+      if (r.remaining < 0) {
+        expand(rest, seen, reachable)
+
+      } else {
+        if (not (do canEnter(r.x, r.y))){
+          expand(rest, seen, reachable)
+
+        } else {
+          if (betterSeen(seen, r.x, r.y, r.remaining)) {
+            expand(rest, seen, reachable)
+
+          } else {
+            val c = do moveCost(r.x, r.y)
+            val nextRemaining = r.remaining - c
+
+            val newSeen =
+              updateSeen(seen, r.x, r.y, r.remaining)
+
+            val newFrontier =
+              if (nextRemaining >= 0) {
+                append(rest, neighbors(Reach(r.x, r.y, nextRemaining)))
+              }else
+                rest
+
+            expand(
+              newFrontier,
+              newSeen,
+              Cons(TilePos(r.x, r.y), reachable)
+            )
+          }
+        }
+      }
+    }
+  }
+
+
+
+
+
+def withGroundRules[R](
+  map: GameMap,
+  startX: Int,
+  startY: Int
+) { program: () => R / { canEnter, moveCost } } : R =
+  try {
+    program()
+  }
+  with canEnter { (x, y) =>
+    val inBounds =
+      x >= 0 && y >= 0 &&
+      x < map.width && y < map.height
+
+    val terrainOK =
+      tileAt(map, x, y) match {
+        case TileFloor() => true
+        case TileWall()  => false
+      }
+
+    val occupied =
+      unitAt(map.units, x, y).isDefined() &&
+      not(x == startX && y == startY)
+
+    resume(inBounds && terrainOK && not(occupied))
+  }
+  with moveCost { (x, y) =>
+    resume(
+      tileAt(map, x, y) match {
+        case TileFloor() => 1
+        case TileWall()  => 999
+      }
+    )
+  }
+
+
+
+
+def withGroundMovement(
+  map: GameMap,
+  u: gameUnbit
+): List[TilePos] =
+  try {
+    reachableTiles(u.x, u.y, u.movement)
+  }
+  with canEnter { (x, y) =>
+    val inBounds =
+      x >= 0 && y >= 0 &&
+      x < map.width && y < map.height
+
+    val terrainOK =
+      tileAt(map, x, y) match {
+        case TileFloor() => true
+        case TileWall()  => false
+      }
+
+    val occupied =
+      unitAt(map.units, x, y).isDefined() &&
+      not(x == u.x && y == u.y)
+
+    resume(inBounds && terrainOK && not(occupied))
+  }
+  with moveCost { (x, y) =>
+    resume(
+      tileAt(map, x, y) match {
+        case TileFloor() => 1
+        case TileWall()  => 999
+      }
+    )
+  }
+
+
+
+def unitAt(
+  units: List[gameUnbit],
+  x: Int,
+  y: Int
+): Option[gameUnbit] =
+  units match {
+    case Nil() =>
+      None()
+
+    case Cons(u, rest) =>
+      if (u.x == x && u.y == y)
+        Some(u)
+      else
+        unitAt(rest, x, y)
+  }
+
+def reachableTiles(
+  x: Int,
+  y: Int,
+  movement: Int
+): List[TilePos] / { canEnter, moveCost } =
+  expand(
+    Cons(Reach(x, y, movement), Nil()),
+    Nil(),
+    Nil()
+  )
+
+
+
+
+
+

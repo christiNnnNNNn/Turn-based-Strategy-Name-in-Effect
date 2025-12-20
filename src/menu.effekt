@@ -1,200 +1,99 @@
 module menu
 
-
-import string
-import src/renderer
 import src/maploader
 import src/model
+import src/movement
+import src/renderer
+import string
 
 
-extern type Node
-extern type Canvas
+extern type JSConsole
 
-extern type File
-record TilePos(x: Int, y: Int)
-extern type ClickPos
+
+
+
+
+
+extern def readFile(path: String) at io: String =
+  jsNode """
+    require('fs').readFileSync(${path}, 'utf8')
+  """
+
+extern def printString(s: String) at io: Unit =
+  jsNode "process.stdout.write(${s})"
+
+extern def readLine(console: JSConsole) at async: String =
+    jsNode "$effekt.capture(k => ${console}.once('line', k))"
+extern def newConsole() at io: JSConsole =
+    jsNode """readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      })"""
+extern def closeConsole(c: JSConsole) at io: Unit =
+  jsNode "${c}.close()"
+
 type UIAction {
-  NoAction()
-  SwitchWeapon(index: Int)
-
-  SelectTile(tx: Int, ty: Int)
-}
-
-
-extern def getElementById(id: String) at io: Node =
-  jsWeb "(document.getElementById(${id}))"
-
-extern def createElement(tag: String) at io: Node =
-  jsWeb "document.createElement(${tag})"
-
-extern def appendChild(parent: Node, child: Node) at io: Unit =
-  jsWeb "${parent}.appendChild(${child})"
-
-extern def setHTML(node: Node, txt: String) at io: Unit =
-  jsWeb "${node}.innerHTML = ${txt}"
-
-extern def setStyle(node: Node, css: String) at io: Unit =
-  jsWeb "${node}.style = ${css}"
-
-extern def onClick(node: Node, handler: () => Unit at {io, global}) at io: Unit =
-  jsWeb """
-    ${node}.addEventListener('click', () => {
-      $effekt.runToplevel((ks, k) => ${handler}(ks, k));
-    })
-  """
-extern def onCanvasClick(
-  canvas: Canvas,
-  handler: ClickPos => Unit at {io, global}
-) at io: Unit =
-  jsWeb """
-    ${canvas}.addEventListener('click', ev => {
-      const rect = ${canvas}.getBoundingClientRect();
-      const x = ev.clientX - rect.left;
-      const y = ev.clientY - rect.top;
-      $effekt.runToplevel((ks, k) =>
-        ${handler}({ x: x, y: y }, ks, k)
-      );
-    });
-  """
-
-
-
-extern def getCanvas(id: String) at io: Canvas =
-  jsWeb "(document.getElementById(${id}))"
-
-extern def getContext(canvas: Canvas) at io: Ctx2D =
-  jsWeb "${canvas}.getContext('2d')"
-
-extern def clearScreen(ctx: Ctx2D) at io: Unit =
-  jsWeb "${ctx}.clearRect(0,0,800,600)"
-
-extern def drawText(ctx: Ctx2D, text: String, x: Int, y: Int) at io: Unit =
-  jsWeb """
-    ${ctx}.font = '26px monospace';
-    ${ctx}.fillStyle = 'white';
-    ${ctx}.fillText(${text}, ${x}, ${y});
-  """
-
-extern def setCanvasStyle(canvas: Canvas, css: String) at io: Unit =
-  jsWeb "${canvas}.style = ${css}"
-
-
-extern def enableDropTarget(node: Canvas) at io: Unit =
-  jsWeb """
-    ${node}.addEventListener('dragover', ev => ev.preventDefault());
-  """
-
-extern def onFileDrop(node: Canvas, handler: String => Unit at {io, global}) at io: Unit =
-  jsWeb """
-    ${node}.addEventListener('drop', ev => {
-      ev.preventDefault();
-      const file = ev.dataTransfer.files[0];
-      if (file) {
-        file.text().then(text => {
-          $effekt.runToplevel((ks, k) => ${handler}(text, ks, k));
-        });
-      }
-    });
-  """
-extern def readFileAsText(file: File) at io: String =
-  jsWeb "(${file}.text())"
-
-extern def clickX(pos: ClickPos) at io: Int =
-  jsWeb "${pos}.x"
-
-extern def clickY(pos: ClickPos) at io: Int =
-  jsWeb "${pos}.y"
-
-
-
-extern def fileName(file: File) at io: String =
-  jsWeb "${file}.name"
-
-type MenuState {
-  Menu()
-  MapLoaded(map: GameMap, filename: String)
   Quit()
-}
+  SelectUnit(x: Int, y: Int)
+  ShowMovement()
+  SwitchWeapon(index: Int)
+  MoveCursor(dx: Int, dy: Int)
+  CancelMove()
+  ConfirmMove() 
+  }
 
 
 
 
-val tileSize = 40
 
+def isReachable(x: Int, y: Int, rs: List[TilePos]): Bool =
+  rs match {
+    case Nil() => false
+    case Cons(p, rest) =>
+      if (p.x == x && p.y == y) true
+      else isReachable(x, y, rest)
+  }
 
-
-def unitAt(
+def unitAtPos(
   units: List[gameUnbit],
-  tx: Int,
-  ty: Int
+  x: Int,
+  y: Int
 ): Option[gameUnbit] =
   units match {
-    case Nil() =>
-      None()
-
+    case Nil() => None()
     case Cons(u, rest) =>
-      if (u.x == tx && u.y == ty)
-        Some(u)
-      else
-        unitAt(rest, tx, ty)
+      if (u.x == x && u.y == y) Some(u)
+      else unitAtPos(rest, x, y)
+  }
+def tileAt(
+  tiles: List[List[Tile]],
+  x: Int,
+  y: Int
+): Tile =
+  tiles match {
+    case Nil() =>
+      TileWall()   
+
+    case Cons(row, rest) =>
+      if (y == 0) tileAtRow(row, x)
+      else tileAt(rest, x, y - 1)
   }
 
+def tileAtRow(row: List[Tile], x: Int): Tile =
+  row match {
+    case Nil() =>
+      TileWall()
 
-def weaponKindToString(k: WeaponKind): String =
-  k match {
-    case Axe()   => "Axe"
-    case Sword() => "Sword"
-    case Lance() => "Lance"
-    case Bow()   => "Bow"
-    case Tome()  => "Tome"
-  }
-def damageTypeToString(d: DamageType): String =
-  d match {
-    case Physical() => "Physical"
-    case Magic()    => "Magic"
-  }
-def weaponsToHTML(
-  ws: List[Weapon],
-  active: Int
-): String = {
-
-  def loop(ws: List[Weapon], i: Int): String =
-    ws match {
-      case Nil() => ""
-      case Cons(w, rest) =>
-        val marker =
-          if (i == active) "▶ " else ""
-
-        marker ++ w.name ++ "<br/>" ++ loop(rest, i + 1)
-    }
-
-  loop(ws, 0)
-}
-
-
-
-def activeWeaponInfo(u: gameUnbit): String =
-  getActiveWeapon(u) match {
-    case None() =>
-      "<i>No active weapon</i>"
-
-    case Some(w) =>
-      "<b>ACTIVE WEAPON</b><br/>" ++
-      "Name: " ++ w.name ++ "<br/>" ++
-      "Type: " ++ weaponKindToString(w.kind) ++ "<br/>" ++
-      "Damage: " ++ damageTypeToString(w.damageType) ++ "<br/>" ++
-      "ATK: " ++ show(w.attack) ++ "<br/>" ++
-      "HIT: " ++ show(w.hit) ++ "%<br/>" ++
-      "CRIT: " ++ show(w.crit) ++ "%<br/>" ++
-      "Uses: " ++ show(w.uses)
+    case Cons(t, rest) =>
+      if (x == 0) t
+      else tileAtRow(rest, x - 1)
   }
 
+def switchWeapon(
+  u: gameUnbit,
+  newIndex: Int
+): gameUnbit = {
 
-def canSwitchWeapon(u: gameUnbit): Bool =
-  u.side == "player"
-
-
-def switchWeapon(u: gameUnbit, newIndex: Int): gameUnbit = {
   def weaponCount(ws: List[Weapon]): Int =
     ws match {
       case Nil() => 0
@@ -204,7 +103,7 @@ def switchWeapon(u: gameUnbit, newIndex: Int): gameUnbit = {
   val count = weaponCount(u.weapons)
 
   if (
-    canSwitchWeapon(u) &&
+    u.side == "player" &&
     newIndex >= 0 &&
     newIndex < count
   )
@@ -222,300 +121,274 @@ def switchWeapon(u: gameUnbit, newIndex: Int): gameUnbit = {
       u.luck,
       u.movement,
       u.weapons,
-      newIndex
+      newIndex       
     )
   else
     u
 }
-
-
-
-
 def replaceUnit(
   units: List[gameUnbit],
+  oldX: Int,
+  oldY: Int,
   updated: gameUnbit
 ): List[gameUnbit] =
   units match {
     case Nil() => Nil()
+
     case Cons(u, rest) =>
-      if (u.x == updated.x && u.y == updated.y)
+      if (u.x == oldX && u.y == oldY)
         Cons(updated, rest)
       else
-        Cons(u, replaceUnit(rest, updated))
+        Cons(u, replaceUnit(rest, oldX, oldY, updated))
+  }
+
+def parseWeaponIndex(line: String): Option[Int] =
+  try {
+    Some(line.toInt1)
+  } with Exception[WrongFormat] {
+    def raise(_, _) = None()
+  }
+
+def parseIntOpt(s: String): Option[Int] =
+  try {
+    Some(s.toInt)
+  } with Exception[WrongFormat] {
+    def raise(_, _) = None()
   }
 
 
-
-def runMenu(canvasId: String): Unit = {
-  val selectedUnit = ref(None())
-  val statPanel = createElement("div")
-  val canvas = getCanvas(canvasId)
-  val currentMap   = ref(None())
-  val weaponPanel = createElement("div")
-  val ctx    = getContext(canvas)
-  def debugUnit(prefix: String, u: gameUnbit): Unit = {
-    println(prefix ++
-      " side=" ++ u.side ++
-      " pos=(" ++ show(u.x) ++ "," ++ show(u.y) ++ ")" ++
-      " activeWeapon=" ++ show(u.activeWeapon)
-    )
+def dropEmpty(xs: List[String]): List[String] =
+  xs match {
+    case Nil() => Nil()
+    case Cons(h, t) =>
+      if (h.trim() == "") dropEmpty(t)
+      else Cons(h, dropEmpty(t))
   }
 
-  def debugSelected(prefix: String): Unit =
-    selectedUnit.get() match {
-      case None() => println(prefix ++ " selectedUnit=None")
-      case Some(u) => debugUnit(prefix ++ " selectedUnit=Some", u)
-    }
+def runMenu(
+  map: GameMap,
+  selected: Option[gameUnbit],
+  reachable: List[TilePos],
+  moveState: Option[MoveState]
+): Unit = {
+ def parseInput(line: String): UIAction = {
+  val trimmed = line.trim()
+  dbg("parseInput raw='" ++ line ++ "' trimmed='" ++ trimmed ++ "'")
+  if (trimmed == "q") {
+     dbg("parseInput -> Quit")
+    Quit()
+  } else if (trimmed == "m") {
+     dbg("parseInput -> ShowMovement")
+    ShowMovement()
+    }else if (trimmed == "w")  {
+       dbg("parseInput -> MoveCursor(0,-1)")
+       MoveCursor(0, -1)}
+    else if (trimmed == "s")  {MoveCursor(0, 1)}
+    else if (trimmed == "a")  {MoveCursor(-1, 0)}
+    else if (trimmed == "d")  {MoveCursor(1, 0)}
+    else if (trimmed == "c")  {CancelMove()}
+    else if (trimmed == "r") {
+  ConfirmMove()
+}
+   else {
+    val toks = dropEmpty(split(trimmed, " "))
 
-  setCanvasStyle(canvas, "background:black; border:3px dashed yellow")
-  val state = ref[MenuState](Menu())
-  val ui = getElementById("app")
-  ui.setHTML("")
-  def makeButton(label: String): Node = {
-    val b = createElement("button")
-    setHTML(b, label)
-    setStyle(b, """
-      display:block;
-      margin: 10px auto;
-      padding: 12px 30px;
-      font-size: 18px;
-      font-family: monospace;
-      background:#333;
-      color:white;
-      border:3px solid white;
-      border-radius:12px;
-      cursor:pointer;
-    """)
-    b
-  }
-  setStyle(weaponPanel, """
-  position:absolute;
-  right:10px;
-  top:280px;
-  width:240px;
-  padding:12px;
-  background:#222;
-  color:white;
-  font-family:monospace;
-  border:2px solid white;
-  """)
+    toks match {
+      
+      case Cons("s", Cons(xs, Cons(ys, Nil()))) =>
+        (parseIntOpt(xs), parseIntOpt(ys)) match {
+          case (Some(x), Some(y)) =>
+          
+            SelectUnit(x - 1, y - 1)
 
-  appendChild(ui, weaponPanel)
-
-    val btnLoad = makeButton(" LOAD MAP (drag file to canvas)")
-    val btnQuit = makeButton(" QUIT")
-
-    appendChild(ui, btnLoad)
-    appendChild(ui, btnQuit)
-    
-
-    def drawMenu(ctx: Ctx2D): Unit = {
-    ctx.drawText("TACTICAL RPG", 260, 120)
-    ctx.drawText("Drop a map file on canvas!", 200, 180)
-    ctx.drawText("Or click LOAD MAP", 240, 220)
-  }
-
-  def drawQuit(ctx: Ctx2D): Unit = {
-    ctx.drawText("Goodbye!", 320, 180)
-  }
-  def apply(action: UIAction): Unit =
-    action match {
-      case SwitchWeapon(i) =>
-      println("APPLY SwitchWeapon i=" ++ show(i))
-        selectedUnit.get() match {
-          case Some(u) =>
-           println("side = " ++ u.side)
-          println("canSwitch = " ++ show(canSwitchWeapon(u)))
-            if (canSwitchWeapon(u)) {
-              currentMap.get() match {
-                case Some(m) =>
-                  val updated = switchWeapon(u, i)
-                  debugUnit("OLD:", u)
-                  debugUnit("UPDATED:", updated)
-                  currentMap.set(
-                    Some(
-                      GameMap(
-                        m.width,
-                        m.height,
-                        m.tiles,
-                        replaceUnit(m.units, updated)
-                      )
-                    )
-                  )
-                  currentMap.get() match {
-                    case Some(m2) =>
-                      unitAt(m2.units, updated.x, updated.y) match {
-                        case None() =>
-                          println("ERROR: updated unit not found in new map!")
-                        case Some(u2) =>
-                          debugUnit("MAP READBACK:", u2)
-                      }
-                    case None() => println("ERROR: currentMap became None after set?")
-                  }
-                  selectedUnit.set(Some(updated))
-                  debugSelected("AFTER selectedUnit.set:")
-                case None() => ()
-              }
-            } else {
-              ()
-            }
-
-          case None() => ()
+          case _ =>
+            printString("Invalid coordinates\n")
+            ShowMovement()
         }
 
-      case SelectTile(tx, ty) =>
-      println("APPLY SelectTile (" ++ show(tx) ++ "," ++ show(ty) ++ ")")
-  debugSelected("Before SelectTile overwrite check:")
-  (selectedUnit.get(), currentMap.get()) match {
-    case (Some(sel), Some(m)) =>
-      if (sel.x == tx && sel.y == ty)
-        () // keep current selectedUnit
-      else
-        selectedUnit.set(unitAt(m.units, tx, ty))
+      
+      case Cons(n, Nil()) =>
+        parseIntOpt(n) match {
+          case Some(i) => SwitchWeapon(i - 1)
+          case None() =>
+            printString("Invalid command\n")
+            ShowMovement()
+        }
 
-    case (_, Some(m)) =>
-      selectedUnit.set(unitAt(m.units, tx, ty))
-
-    case _ =>
-      selectedUnit.set(None())
-    debugSelected("After SelectTile:")
-  }
-
-        
-      case NoAction() => ()
+      case _ =>
+        printString("Invalid command\n")
+        ShowMovement()
     }
-
-
-
-
-
- def renderStats(): Unit =
-  selectedUnit.get() match {
-    case None() =>
-      statPanel.setHTML("<i>No unit selected</i>")
-
-    case Some(u) =>
-      statPanel.setHTML(
-        """
-        <b>UNIT STATS</b><br/>
-        Side: """ ++ u.side ++ """<br/><br/>
-        HP: """ ++ show(u.hp) ++ """<br/>
-        STR: """ ++ show(u.strength) ++ """<br/>
-        MAG: """ ++ show(u.magic) ++ """<br/>
-        DEF: """ ++ show(u.defense) ++ """<br/>
-        RES: """ ++ show(u.resistance) ++ """<br/>
-        PRE: """ ++ show(u.precision) ++ """<br/>
-        AGI: """ ++ show(u.agility) ++ """<br/>
-        LUCK: """ ++ show(u.luck) ++ """<br/>
-        MOV: """ ++ show(u.movement)
-      )
   }
-  
-
-
-
+}
 
 
 
 
  
+  val buffer = ref(makeBuffer(map.width, map.height))
+  
+  withConsole(buffer, map, selected, reachable, moveState)
+  selected match {
+  case Some(u) =>
+    printUnitStats(u)
+    printWeapons(u)
+  case None() =>
+    printString("\n(No unit selected)\n")
+}
+  moveState match {
+  case Some(Moving(_, _, _, _, _, rem)) =>
+    printString("\nRemaining movement: " ++ rem.show ++ "\n")
+  case None() => ()
+}
+  printBuffer(buffer.get())
+   
+ 
+  
+  val c = newConsole()
+  val line = readLine(c)
+  closeConsole(c)
+  dbg("readLine returned: '" ++ line ++ "'")
+  dbg("dispatch action")
+  val action = parseInput(line)
+  action match {
+    case Quit() =>
+    printString("Bye!\n")
+    ()
+    case SelectUnit(x, y) =>
+  dbg("SelectUnit(" ++ x.show ++ "," ++ y.show ++ ")")
 
+  val newSelected = unitAt(map.units, x, y)
 
-  def renderUi(): Unit = {
-    ctx.clearScreen()
-   def makeWeaponButton(
-  u: gameUnbit,
-  w: Weapon,
-  idx: Int
-): Unit = {
-  val btn = createElement("button")
-
-  // embed index into DOM
-  setHTML(
-    btn,
-    (if (idx == u.activeWeapon) "▶ " else "") ++
-    w.name ++
-    " [#" ++ show(idx) ++ "]"
+  dbg(
+    "SelectUnit result: " ++
+    (newSelected match {
+      case Some(_) => "Some(unit)"
+      case None()  => "None"
+    })
   )
 
-  onClick(btn, box {
-    // parse index back out
-    apply(SwitchWeapon(idx))
-    renderUi()
-  })
+  
+  runMenu(
+    map,
+    newSelected,
+    Nil(),        
+    None()       
+  )
+   case MoveCursor(dx, dy) =>
+  moveState match {
+    case Some(Moving(u, sx, sy, cx, cy, rem)) =>
+      val nx = cx + dx
+      val ny = cy + dy
 
-  appendChild(weaponPanel, btn)
-}
-
-
-
-    
-   def renderWeapons(u: gameUnbit): Unit = {
-  weaponPanel.setHTML("")
-
-  def loop(ws: List[Weapon], idxs: List[Int]): Unit =
-    (ws, idxs) match {
-      case (Nil(), _) => ()
-      case (_, Nil()) => ()
-      case (Cons(w, wsRest), Cons(i, idxRest)) =>
-        makeWeaponButton(u, w, i)
-        loop(wsRest, idxRest)
-    }
-
-  loop(u.weapons, Cons(0, Cons(1, Cons(2, Nil()))))
-  val sep = createElement("hr")
-  appendChild(weaponPanel, sep)
-
-  // ---- active weapon stats ----
-  val info = createElement("div")
-  setHTML(info, activeWeaponInfo(u))
-  appendChild(weaponPanel, info)
-}
-
-
-    // ----- main render -----
-    state.get() match {
-
-      case MapLoaded(_, _) =>
-        currentMap.get() match {
-          case Some(m) =>
-            drawMap(ctx, m)
-
-            m.units.foreach { u =>
-              val baseColor =
-                if (u.side == "player") "blue" else "red"
-
-              val color =
-                selectedUnit.get() match {
-                  case Some(sel) =>
-                    if (sel.x == u.x && sel.y == u.y) "yellow"
-                    else baseColor
-                  case None() =>
-                    baseColor
-                }
-
-              drawUnit(ctx, u, color)
-            }
-
-            renderStats()
-
-            selectedUnit.get() match {
-              case Some(u) => 
-                debugUnit("renderWeapons called with:", u)
-                renderWeapons(u)
-              case None()  =>
-                weaponPanel.setHTML("<i>No unit selected</i>")
-            }
-
-          case None() => ()
+      val newRem =
+        withGroundRules(map, u.x, u.y) {
+          tryMove(nx, ny, rem)
         }
 
-      case Menu() =>
-        drawMenu(ctx)
+      val nextState =
+        if (newRem >= 0 && newRem < rem)
+          Some(Moving(u, sx, sy, nx, ny, newRem))
+        else
+          moveState
 
-      case Quit() =>
-        drawQuit(ctx)
+      runMenu(map, selected, reachable, nextState)
+
+    case None() =>
+      runMenu(map, selected, reachable, None())
+  }
+
+
+  case CancelMove() =>
+  runMenu(map, selected, reachable, None())
+  case ConfirmMove() =>    
+  printString("[DBG] ConfirmMove pressed\n")     
+    moveState match {
+      case Some(Moving(u, sx, sy, cx, cy, _)) =>
+        printString(
+        "[DBG] Commit cursor at (" ++ cx.show ++ "," ++ cy.show ++ ")\n"
+      )
+        val moved =
+          gameUnbit(
+            u.side,
+            cx, cy,
+            u.hp,
+            u.strength,
+            u.magic,
+            u.defense,
+            u.resistance,
+            u.precision,
+            u.agility,
+            u.luck,
+            u.movement,
+            u.weapons,
+            u.activeWeapon
+          )
+        printString(
+  "[DBG] New unit position = (" ++ moved.x.show ++ "," ++ moved.y.show ++ ")\n"
+)
+         val newUnits =
+        replaceUnit(map.units, sx, sy, moved)
+
+      val newMap =
+        GameMap(map.width, map.height, map.tiles, newUnits)
+        map.units.foreach { u =>
+  printString(
+    "[DBG] render unit at (" ++ u.x.show ++ "," ++ u.y.show ++ ")\n"
+  )
+}
+
+      runMenu(newMap, Some(moved), Nil(), None())
+
+      case None() =>
+        runMenu(map, selected, reachable, None())
     }
+
+   
+  case ShowMovement() =>
+  val newReachable =
+    selected match {
+      case Some(u) =>
+        withGroundMovement(map, u)
+      case None() =>
+        Nil()
+    }
+
+  val newMoveState =
+    selected match {
+      case Some(u) =>
+        if (u.side == "player")
+          Some(Moving(u, u.x, u.y, u.x, u.y, u.movement))
+        else
+          None()   
+      case None() =>
+        None()
+    }
+
+  runMenu(
+    map,
+    selected,
+    newReachable,
+    newMoveState
+  )
+    case SwitchWeapon(i) =>
+  selected match {
+    case Some(u) =>
+      val updated = switchWeapon(u, i)
+
+      
+      val newUnits = replaceUnit(map.units, u.x, u.y, updated)
+
+      val newMap =
+        GameMap(map.width, map.height, map.tiles, newUnits)
+
+      runMenu(newMap, Some(updated), reachable, moveState)
+
+    case None() =>
+      runMenu(map, selected, reachable, moveState)
+  }
+
+
   }
 
 
@@ -526,67 +399,5 @@ def runMenu(canvasId: String): Unit = {
 
 
 
- 
+  }
 
-
-
-
- 
-
-
-
-  
-  
-  def getActiveWeapon(u: gameUnbit): Option[Weapon] = {
-  def loop(ws: List[Weapon], idx: Int): Option[Weapon] =
-    ws match {
-      case Nil() => None()
-      case Cons(w, rest) =>
-        if (idx == 0) Some(w)
-        else loop(rest, idx - 1)
-    }
-
-  if (u.activeWeapon < 0) None()
-  else loop(u.weapons, u.activeWeapon)
-}
-
-
-  enableDropTarget(canvas)
-
-  onFileDrop(canvas, box { text =>
-  val parsed = parseMap(text)
-  currentMap.set(Some(parsed))
-  state.set(MapLoaded(parsed, "dropped.map"))
-  renderUi()
-})
-
-
-
-
-  
-  onClick(btnQuit, box {
-    state.set(Quit())
-    renderUi()
-  })
-  onCanvasClick(canvas, box { pos =>
-  apply(SelectTile(
-    clickX(pos) / tileSize,
-    clickY(pos) / tileSize
-  ))
-  renderUi()
-})
-
-  setStyle(statPanel, """
-    position:absolute;
-    right:10px;
-    top:10px;
-    width:240px;
-    padding:12px;
-    background:#222;
-    color:white;
-    font-family:monospace;
-    border:2px solid white;
-  """)
-  appendChild(ui, statPanel)
-
-}

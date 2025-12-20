@@ -1,6 +1,10 @@
 module model
 
 type Tile { TileFloor(); TileWall() }
+type MovementKind {
+  Ground()
+  Flying()
+}
 
 record gameUnbit(
   

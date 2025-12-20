@@ -1,56 +1,266 @@
 module renderer
 
-import src/maploader
 import src/model
+import src/Movement
+def dbg(s: String): Unit = printString("[DBG] " ++ s ++ "\n")
 
-extern type Ctx2D
 
-extern def fillRect(ctx: Ctx2D, x: Int, y: Int, w: Int, h: Int, color: String) at io: Unit =
-  jsWeb """
-    ${ctx}.fillStyle = ${color};
-    ${ctx}.fillRect(${x}, ${y}, ${w}, ${h});
-  """
+type MoveState {
+  Moving(
+    unit: gameUnbit,
+    startX: Int,
+    startY: Int,
+    curX: Int,
+    curY: Int,
+    remaining: Int
+  )
+}
+effect DrawTile(x: Int, y: Int, fill: String, outline: String): Unit
+effect DrawUnit(x: Int, y: Int, color: String): Unit
+effect HighlightTile(x: Int, y: Int, color: String): Unit
+record Cell(char: String, fg: String, bg: String)
+type Buffer = List[List[Cell]]
+extern def printString(s: String) at io: Unit =
+  jsNode "process.stdout.write(${s})"
 
-extern def strokeRect(ctx: Ctx2D, x: Int, y: Int, w: Int, h: Int) at io: Unit =
-  jsWeb """
-    ${ctx}.strokeStyle = 'black';
-    ${ctx}.strokeRect(${x}, ${y}, ${w}, ${h});
-  """
+def printUnitStats(u: gameUnbit): Unit = {
+  printString("\n=== UNIT STATS ===\n")
+  printString("Side: " ++ u.side ++ "\n")
+  printString("Pos: (" ++ u.x.show ++ "," ++ u.y.show ++ ")\n")
+  printString("HP: " ++ u.hp.show ++ "\n")
+  printString("STR: " ++ u.strength.show ++ "\n")
+  printString("MAG: " ++ u.magic.show ++ "\n")
+  printString("DEF: " ++ u.defense.show ++ "\n")
+  printString("RES: " ++ u.resistance.show ++ "\n")
+  printString("MOV: " ++ u.movement.show ++ "\n")
+}
+def printWeapons(u: gameUnbit): Unit = {
+  printString("\n=== WEAPONS ===\n")
 
-extern def drawCircle(ctx: Ctx2D, x: Int, y: Int, r: Int, color: String) at io: Unit =
-  jsWeb """
-    ${ctx}.beginPath();
-    ${ctx}.fillStyle=${color};
-    ${ctx}.arc(${x},${y},${r},0,Math.PI*2);
-    ${ctx}.fill();
-  """
-def drawUnit(ctx: Ctx2D, u: gameUnbit, color: String): Unit = {
-  val tileSize = 40
-  val cx = u.x * tileSize + tileSize / 2
-  val cy = u.y * tileSize + tileSize / 2
+  def loop(ws: List[Weapon], idx: Int): Unit =
+    ws match {
+      case Nil() => ()
+      case Cons(w, rest) =>
+        val marker =
+          if (idx == u.activeWeapon) "▶ " else "  "
 
-  drawCircle(ctx, cx, cy, 12, color)
+        printString(
+          marker ++
+          idx.show ++ ": " ++ w.name ++
+          " ATK=" ++ w.attack.show ++
+          " HIT=" ++ w.hit.show ++
+          " CRIT=" ++ w.crit.show ++ "\n"
+        )
+
+        loop(rest, idx + 1)
+    }
+
+  loop(u.weapons, 0)
+}
+def ansiFg(c: String): String =
+  c match {
+    case "white"  => "\u001b[37m"
+    case "red"    => "\u001b[31m"
+    case "blue"   => "\u001b[34m"
+    case "yellow" => "\u001b[33m"
+    case "red"   => "\u001b[41m"
+    case _        => "\u001b[37m"
+  }
+
+def ansiBg(c: String): String =
+  c match {
+    case "green" => "\u001b[42m"
+    case "gray"  => "\u001b[100m"
+    case "blue"  => "\u001b[44m"
+    case "red"   => "\u001b[41m"
+    case _       => "\u001b[40m"
+  }
+
+def ansiReset(): String = "\u001b[0m"
+
+def printBuffer(buf: Buffer): Unit =
+  buf match {
+    case Nil() => ()
+    case Cons(row, rest) =>
+      printRow(row)
+      println("")
+      printBuffer(rest)
+  }
+
+def printRow(row: List[Cell]): Unit =
+  row match {
+    case Nil() => ()
+    case Cons(c, rest) =>
+      printString(
+        ansiBg(c.bg) ++
+        ansiFg(c.fg) ++
+        c.char ++
+        ansiReset()
+      )
+      printRow(rest)
+  }
+
+
+
+def emptyCell(): Cell =
+  Cell(" ", "white", "black")
+
+
+
+
+def makeRow(w: Int): List[Cell] =
+  if (w <= 0) Nil()
+  else Cons(emptyCell(), makeRow(w - 1))
+
+def makeBuffer(w: Int, h: Int): Buffer =
+  if (h <= 0) Nil()
+  else Cons(makeRow(w), makeBuffer(w, h - 1))
+
+
+def getCell(buf: Buffer, x: Int, y: Int): Cell =
+  buf match {
+    case Cons(row, rest) =>
+      if (y == 0) getRowCell(row, x)
+      else getCell(rest, x, y - 1)
+    case Nil() => emptyCell()
+  }
+
+def getRowCell(row: List[Cell], x: Int): Cell =
+  row match {
+    case Cons(c, rest) =>
+      if (x == 0) c else getRowCell(rest, x - 1)
+    case Nil() => emptyCell()
+  }
+
+def setCell(
+  buf: Buffer,
+  x: Int,
+  y: Int,
+  c: Cell
+): Buffer =
+  buf match {
+    case Nil() => Nil()
+    case Cons(row, rest) =>
+      if (y == 0)
+        Cons(setRowCell(row, x, c), rest)
+      else
+        Cons(row, setCell(rest, x, y - 1, c))
+  }
+
+def setRowCell(row: List[Cell], x: Int, c: Cell): List[Cell] =
+  row match {
+    case Nil() => Nil()
+    case Cons(h, t) =>
+      if (x == 0) Cons(c, t)
+      else Cons(h, setRowCell(t, x - 1, c))
+  }
+
+def withConsole(
+  buffer: Ref[Buffer],
+  map: GameMap,
+  selected: Option[gameUnbit],
+  reachable: List[TilePos],
+  moveState: Option[MoveState]
+): Unit =
+  try {
+    
+    buffer.set(makeBuffer(map.width, map.height))
+
+ 
+    renderMap(map)
+
+    val reachColor =
+  selected match {
+    case Some(u) =>
+      if (u.side == "player") "blue" else "red"
+    case None() =>
+      "blue"
+  }
+
+reachable.foreach { p =>
+  do HighlightTile(p.x, p.y, reachColor)
 }
 
-def drawMap(ctx: Ctx2D, map: GameMap): Unit = {
-  val tileSize = 40
+    map.units.foreach { u =>
+      val color =
+        selected match {
+          case Some(s) =>
+            if (s.x == u.x && s.y == u.y)
+              "yellow"
+            else if (u.side == "player")
+              "blue"
+            else
+              "red"
 
+          case None() =>
+            if (u.side == "player")
+              "blue"
+            else
+              "red"
+        }
+
+      renderUnit(u, color)
+    }
+
+   
+    moveState match {
+      case Some(Moving(_, _, _, x, y, _)) =>
+        do HighlightTile(x, y, "yellow")
+      case None() => ()
+    }
+
+  }
+  with DrawTile { (x, y, fill, _) =>
+    buffer.set(
+      setCell(buffer.get(), x, y, Cell(".", "white", fill))
+    )
+    resume(())
+  }
+  with HighlightTile { (x, y, color) =>
+    buffer.set(
+      setCell(buffer.get(), x, y, Cell(".", "white", color))
+    )
+    resume(())
+  }
+  with DrawUnit { (x, y, color) =>
+    val bg = getCell(buffer.get(), x, y).bg
+    buffer.set(
+      setCell(buffer.get(), x, y, Cell("@", color, bg))
+    )
+    resume(())
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+def renderMap(map: GameMap): Unit / { DrawTile } = {
   var y = 0
   map.tiles.foreach { row =>
     var x = 0
     row.foreach { tile =>
-      if (tile is TileFloor()) {
-        fillRect(ctx, x, y, tileSize, tileSize, "green")
-      } else {
-        fillRect(ctx, x, y, tileSize, tileSize, "gray")
-      }
-      strokeRect(ctx, x, y, tileSize, tileSize)
-      x = x + tileSize
+      val fill =
+        tile match {
+          case TileFloor() => "green"
+          case TileWall()  => "gray"
+        }
+
+      do DrawTile(x, y, fill, "black")
+      x = x + 1
     }
-    y = y + tileSize
+    y = y + 1
   }
-  println("unit count = " ++ show(map.units.size()))
-  
 }
 
 
+
+def renderUnit(u: gameUnbit, color: String): Unit / { DrawUnit } =
+  do DrawUnit(u.x, u.y, color)
+ 

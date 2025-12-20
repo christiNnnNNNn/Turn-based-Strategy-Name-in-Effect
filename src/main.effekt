@@ -1,8 +1,22 @@
-module main // must be named same as the file!
+module main 
 import src/menu
-def main(): Unit =  {
+import src/movement
+import src/renderer
+import src/maploader
+import src/model
+import io/console
+
+
+     def main() = {
+  val text = readFile("C:/Users/Christian/Documents/testMap.txt")
+  val map  = parseMap(text)
+
+
+  val selected: Option[gameUnbit] = None()
+  val reachable: List[TilePos] = Nil()
+  var moveState: Option[MoveState] = None()
+  with console;
+  runMenu(map, selected, reachable,moveState)
+}
 
   
-
-  runMenu("gameCanvas")
-}
