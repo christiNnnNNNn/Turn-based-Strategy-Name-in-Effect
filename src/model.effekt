@@ -74,6 +74,7 @@ record Weapon(
   hit: Int,        // percent 0..100
   uses: Int,       // remaining uses
   crit: Int,       // percent 0..100
+  range:(Int,Int),
   mods: List[WeaponMod]
 )
 def getActiveWeapon(u: gameUnbit): Option[Weapon] = {

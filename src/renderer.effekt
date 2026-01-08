@@ -44,13 +44,18 @@ def printWeapons(u: gameUnbit): Unit = {
         val marker =
           if (idx == u.activeWeapon) "▶ " else "  "
 
-        printString(
-          marker ++
-          idx.show ++ ": " ++ w.name ++
-          " ATK=" ++ w.attack.show ++
-          " HIT=" ++ w.hit.show ++
-          " CRIT=" ++ w.crit.show ++ "\n"
-        )
+        w.range match {
+  case (r1, r2) =>
+    printString(
+      marker ++
+      idx.show ++ ": " ++ w.name ++
+      " ATK=" ++ w.attack.show ++
+      " HIT=" ++ w.hit.show ++
+      " CRIT=" ++ w.crit.show ++
+      " RNG=" ++ r1.show ++ "-" ++ r2.show ++
+      " Uses="++ w.uses.show++     "\n"
+    )
+}
 
         loop(rest, idx + 1)
     }

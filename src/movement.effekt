@@ -46,20 +46,13 @@ def tryMove(
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def isReachable(x: Int, y: Int, rs: List[TilePos]): Bool =
+  rs match {
+    case Nil() => false
+    case Cons(p, rest) =>
+      if (p.x == x && p.y == y) true
+      else isReachable(x, y, rest)
+  }
 
 
 def betterSeen(

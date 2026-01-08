@@ -4,6 +4,7 @@ import src/maploader
 import src/model
 import src/movement
 import src/renderer
+import src/combat
 import string
 
 
@@ -40,19 +41,29 @@ type UIAction {
   MoveCursor(dx: Int, dy: Int)
   CancelMove()
   ConfirmMove() 
+  ListTargets()       
+  ConfirmCombat()     
+  CancelCombat()       
   }
 
+record CombatState(
+  attacker: gameUnbit,
+  attackerStartX: Int,
+  attackerStartY: Int,
+  attackerX: Int,
+  attackerY: Int,
+  defender: gameUnbit,
+  wAtt: Weapon,
+  wDef: Weapon,
+  preview: CombatPreview
+)
 
 
 
 
-def isReachable(x: Int, y: Int, rs: List[TilePos]): Bool =
-  rs match {
-    case Nil() => false
-    case Cons(p, rest) =>
-      if (p.x == x && p.y == y) true
-      else isReachable(x, y, rest)
-  }
+
+
+
 
 def unitAtPos(
   units: List[gameUnbit],
@@ -88,7 +99,15 @@ def tileAtRow(row: List[Tile], x: Int): Tile =
       if (x == 0) t
       else tileAtRow(rest, x - 1)
   }
-
+def printPreview(cs: CombatState): Unit =
+  printString(
+    "\n=== COMBAT PREVIEW ===\n" ++
+    "Target at (" ++ (cs.defender.x + 1).show ++ "," ++ (cs.defender.y + 1).show ++ ")\n" ++
+    "DAMAGE = " ++ cs.preview.dmg.show ++ "\n" ++
+    "HIT%   = " ++ cs.preview.hit.show ++ "\n" ++
+    "CRIT%  = " ++ cs.preview.crit.show ++ "\n" ++
+    "Confirm: f   Cancel: g\n"
+   )
 def switchWeapon(
   u: gameUnbit,
   newIndex: Int
@@ -157,6 +176,64 @@ def parseIntOpt(s: String): Option[Int] =
   }
 
 
+def setWeaponAt(ws: List[Weapon], i: Int, nw: Weapon): List[Weapon] =
+  ws match {
+    case Nil() => Nil()
+    case Cons(w, rest) =>
+      if (i == 0) Cons(nw, rest)
+      else Cons(w, setWeaponAt(rest, i - 1, nw))
+  }
+def effectivePosition(
+  selected: Option[gameUnbit],
+  moveState: Option[MoveState]
+): Option[(gameUnbit, Int, Int)] =
+  moveState match {
+    case Some(Moving(u, _, _, cx, cy, _)) =>
+      Some((u, cx, cy))
+    case None() =>
+      selected match {
+        case Some(u) => Some((u, u.x, u.y))
+        case None()  => None()
+      }
+  }
+def activeWeapon(u: gameUnbit): Option[Weapon] =
+  getWeaponAt(u.weapons, u.activeWeapon)
+
+def decWeaponUse(u: gameUnbit): gameUnbit =
+  activeWeapon(u) match {
+    case None() => u
+    case Some(w) =>
+      val newUses = max(0, w.uses - 1)
+      val w2 = Weapon(w.name, w.kind, w.damageType, w.attack, w.hit, newUses, w.crit,w.range, w.mods)
+      val ws2 = setWeaponAt(u.weapons, u.activeWeapon, w2)
+      gameUnbit(
+        u.side, u.x, u.y,
+        u.hp, u.strength, u.magic, u.defense, u.resistance,
+        u.precision, u.agility, u.luck,
+        u.movement,
+        ws2,
+        u.activeWeapon
+      )
+  }
+
+
+  def unitSymbol(u: gameUnbit): String =
+    if (u.side == "player") "@" else "☠"
+  def collectTargets(
+  att: gameUnbit,
+  attX: Int,
+  attY: Int,
+  units: List[gameUnbit],
+  wAtt: Weapon
+): List[gameUnbit] =
+  units match {
+    case Nil() => Nil()
+    case Cons(u, rest) =>
+      if (u.side != att.side && inRange(att, attX, attY, u, wAtt))
+        Cons(u, collectTargets(att, attX, attY, rest, wAtt))
+      else
+        collectTargets(att, attX, attY, rest, wAtt)
+  }
 def dropEmpty(xs: List[String]): List[String] =
   xs match {
     case Nil() => Nil()
@@ -164,63 +241,108 @@ def dropEmpty(xs: List[String]): List[String] =
       if (h.trim() == "") dropEmpty(t)
       else Cons(h, dropEmpty(t))
   }
+def printTargets(ts: List[gameUnbit], i: Int): Unit =
+  ts match {
+    case Nil() => ()
+    case Cons(u, rest) =>
+      printString(
+        unitSymbol(u) ++ " " ++ i.show ++
+        " at (" ++ (u.x + 1).show ++ "," ++ (u.y + 1).show ++ ")" ++
+        " HP=" ++ u.hp.show ++ "\n"
+      )
+      printTargets(rest, i + 1)
+  }
+  def inRange(
+  att: gameUnbit,
+  attX: Int,
+  attY: Int,
+  deff: gameUnbit,
+  w: Weapon
+): Bool =
+  val (rmin, rmax) = w.range
+  val d = manhattan(attX, attY, deff.x, deff.y)
+  d >= rmin && d <= rmax
 
+ def getWeaponAt(ws: List[Weapon], i: Int): Option[Weapon] =
+   ws match {
+    case Nil() => None()
+     case Cons(w, rest) =>
+       if (i == 0) Some(w) else getWeaponAt(rest, i - 1)
+   }
+  //menu starts here
 def runMenu(
   map: GameMap,
   selected: Option[gameUnbit],
   reachable: List[TilePos],
-  moveState: Option[MoveState]
+  moveState: Option[MoveState],
+  combatState: Option[CombatState]
 ): Unit = {
- def parseInput(line: String): UIAction = {
-  val trimmed = line.trim()
-  dbg("parseInput raw='" ++ line ++ "' trimmed='" ++ trimmed ++ "'")
-  if (trimmed == "q") {
-     dbg("parseInput -> Quit")
-    Quit()
-  } else if (trimmed == "m") {
-     dbg("parseInput -> ShowMovement")
-    ShowMovement()
-    }else if (trimmed == "w")  {
-       dbg("parseInput -> MoveCursor(0,-1)")
-       MoveCursor(0, -1)}
-    else if (trimmed == "s")  {MoveCursor(0, 1)}
-    else if (trimmed == "a")  {MoveCursor(-1, 0)}
-    else if (trimmed == "d")  {MoveCursor(1, 0)}
-    else if (trimmed == "c")  {CancelMove()}
-    else if (trimmed == "r") {
-  ConfirmMove()
-}
-   else {
-    val toks = dropEmpty(split(trimmed, " "))
 
-    toks match {
-      
-      case Cons("s", Cons(xs, Cons(ys, Nil()))) =>
-        (parseIntOpt(xs), parseIntOpt(ys)) match {
-          case (Some(x), Some(y)) =>
-          
-            SelectUnit(x - 1, y - 1)
+ def parseInput(line: String, combatState: Option[CombatState]): UIAction = {
+  val trimmed = line.trim()
+
+  combatState match {
+
+   
+    case Some(_) =>
+      if (trimmed == "f") {
+        ConfirmCombat()
+      } else if (trimmed == "g") {
+        CancelCombat()
+      } else {
+
+        CancelCombat()
+      }
+
+    case None() =>
+      if (trimmed == "q") {
+        Quit()
+      } else if (trimmed == "m") {
+        ShowMovement()
+      } else if (trimmed == "w") {
+        MoveCursor(0, -1)
+      } else if (trimmed == "s") {
+        MoveCursor(0, 1)
+      } else if (trimmed == "a") {
+        MoveCursor(-1, 0)
+      } else if (trimmed == "d") {
+        MoveCursor(1, 0)
+      } else if (trimmed == "c") {
+        CancelMove()
+      } else if (trimmed == "r") {
+        ConfirmMove()
+      } else if (trimmed == "e") {
+        ListTargets()
+      } else {
+
+        val toks = dropEmpty(split(trimmed, " "))
+
+        toks match {
+
+
+          case Cons("s", Cons(xs, Cons(ys, Nil()))) =>
+            (parseIntOpt(xs), parseIntOpt(ys)) match {
+              case (Some(x), Some(y)) =>
+                SelectUnit(x - 1, y - 1)
+              case _ =>
+                ShowMovement()
+            }
+
+
+          case Cons(n, Nil()) =>
+            parseIntOpt(n) match {
+              case Some(i) => SwitchWeapon(i - 1)
+              case None()  => ShowMovement()
+            }
 
           case _ =>
-            printString("Invalid coordinates\n")
             ShowMovement()
         }
-
-      
-      case Cons(n, Nil()) =>
-        parseIntOpt(n) match {
-          case Some(i) => SwitchWeapon(i - 1)
-          case None() =>
-            printString("Invalid command\n")
-            ShowMovement()
-        }
-
-      case _ =>
-        printString("Invalid command\n")
-        ShowMovement()
-    }
+      }
   }
 }
+
+
 
 
 
@@ -250,7 +372,7 @@ def runMenu(
   closeConsole(c)
   dbg("readLine returned: '" ++ line ++ "'")
   dbg("dispatch action")
-  val action = parseInput(line)
+  val action = parseInput(line,combatState)
   action match {
     case Quit() =>
     printString("Bye!\n")
@@ -273,6 +395,7 @@ def runMenu(
     map,
     newSelected,
     Nil(),        
+    None(),
     None()       
   )
    case MoveCursor(dx, dy) =>
@@ -292,15 +415,14 @@ def runMenu(
         else
           moveState
 
-      runMenu(map, selected, reachable, nextState)
-
+      runMenu(map, selected, reachable, nextState,None())
     case None() =>
-      runMenu(map, selected, reachable, None())
+      runMenu(map, selected, reachable, None(),None())
   }
 
 
   case CancelMove() =>
-  runMenu(map, selected, reachable, None())
+  runMenu(map, selected, reachable, None(), None())
   case ConfirmMove() =>    
   printString("[DBG] ConfirmMove pressed\n")     
     moveState match {
@@ -338,10 +460,10 @@ def runMenu(
   )
 }
 
-      runMenu(newMap, Some(moved), Nil(), None())
+      runMenu(newMap, Some(moved), Nil(), None(), None())
 
       case None() =>
-        runMenu(map, selected, reachable, None())
+        runMenu(map, selected, reachable, None(), None())
     }
 
    
@@ -369,7 +491,8 @@ def runMenu(
     map,
     selected,
     newReachable,
-    newMoveState
+    newMoveState,
+    None()
   )
     case SwitchWeapon(i) =>
   selected match {
@@ -382,12 +505,205 @@ def runMenu(
       val newMap =
         GameMap(map.width, map.height, map.tiles, newUnits)
 
-      runMenu(newMap, Some(updated), reachable, moveState)
+      runMenu(newMap, Some(updated), reachable, moveState, None())
 
     case None() =>
-      runMenu(map, selected, reachable, moveState)
+      runMenu(map, selected, reachable, moveState, None())
   }
+  case ListTargets() =>
+  selected match {
+    case Some(att) =>
+      activeWeapon(att) match {
+        case Some(wAtt) =>
+          val (attX, attY) =
+          moveState match {
+            case Some(Moving(_, _, _, cx, cy, _)) => (cx, cy)
+            case None()                           => (att.x, att.y)
+          }
 
+        val ts = collectTargets(att, attX, attY, map.units, wAtt)
+
+        if (ts is Nil()) {
+          printString("No targets in range.\n")
+          runMenu(map, selected, reachable, moveState,None())
+        } else {
+          printString("\n=== TARGETS (press number) ===\n")
+          printTargets(ts, 1)
+
+          val c2 = newConsole()
+          val line2 = readLine(c2)
+          closeConsole(c2)
+
+
+            val idxOpt = parseIntOpt(line2.trim())
+            idxOpt match {
+              case Some(k) =>
+                val idx0 = k - 1
+                val defOpt = listGet(ts, idx0)   
+                defOpt match {
+                  case Some(target) =>
+                    activeWeapon(target) match {
+                      case Some(wDef) =>
+
+                       
+                        val (sx, sy) =
+                          moveState match {
+                            case Some(Moving(_, sx0, sy0, _, _, _)) => (sx0, sy0)
+                            case None() => (att.x, att.y)
+                          }
+
+                        val (ax, ay) =
+                          moveState match {
+                            case Some(Moving(_, _, _, cx, cy, _)) => (cx, cy)
+                            case None() => (att.x, att.y)
+                          }
+
+                        
+                        val attAtCursor =
+                          gameUnbit(
+                            att.side,
+                            ax, ay,
+                            att.hp,
+                            att.strength, att.magic, att.defense, att.resistance,
+                            att.precision, att.agility, att.luck,
+                            att.movement,
+                            att.weapons,
+                            att.activeWeapon
+                          )
+
+                        val p = previewPure(attAtCursor, target, wAtt, wDef)
+
+                        val cs =
+                          CombatState(attAtCursor, sx, sy, ax, ay, target, wAtt, wDef, p)
+
+                        printPreview(cs)
+                        runMenu(map, selected, reachable, moveState, Some(cs))
+
+                      case None() =>
+                        printString("Defender has no weapon.\n")
+                        runMenu(map, selected, reachable, moveState, combatState)
+                    }
+
+                    
+                  case None() =>
+                    printString("Invalid target.\n")
+                    runMenu(map, selected, reachable, moveState, None())
+                }
+
+              case None() =>
+                printString("Invalid number.\n")
+                runMenu(map, selected, reachable, moveState, None())
+            }
+          }
+
+        case None() =>
+          printString("No active weapon.\n")
+          runMenu(map, selected, reachable, moveState, None())
+      }
+
+    case None() =>
+      printString("No unit selected.\n")
+      runMenu(map, selected, reachable, moveState, None())
+  }
+  case CancelCombat() =>
+ 
+  runMenu(map, selected, reachable, moveState, None())
+
+case ConfirmCombat() =>
+  try {
+    combatState match {
+      case None() =>
+        runMenu(map, selected, reachable, moveState, None())
+
+      case Some(cs) =>
+        
+        val att0 = decWeaponUse(cs.attacker)
+        val att0AtCursor =
+          gameUnbit(
+            att0.side,
+            cs.attackerX, cs.attackerY,
+            att0.hp,
+            att0.strength, att0.magic, att0.defense, att0.resistance,
+            att0.precision, att0.agility, att0.luck,
+            att0.movement,
+            att0.weapons,
+            att0.activeWeapon
+          )
+        val def0 = cs.defender
+
+        activeWeapon(att0) match {
+          case None() =>
+            runMenu(map, selected, reachable, None(), None())
+
+          case Some(wAttNow) =>
+            activeWeapon(def0) match {
+              case None() =>
+                runMenu(map, selected, reachable, None(), None())
+
+              case Some(wDefNow) =>
+                val pAtt = previewPure(att0, def0, wAttNow, wDefNow)
+                val r1   = resolveAttack(att0, def0, pAtt)
+                val def1 = applyDamage(def0, r1.damage)
+
+                printString(
+                  "\nATTACKER: " ++
+                  (if (r1.hit) "HIT" else "MISS") ++
+                  (if (r1.crit) " (CRIT)" else "") ++
+                  " dmg=" ++ r1.damage.show ++ "\n"
+                )
+
+                val unitsA =
+                  replaceUnit(map.units, cs.attackerStartX, cs.attackerStartY, att0AtCursor)
+
+                
+                val units1 =
+                  replaceUnit(unitsA, def0.x, def0.y, def1)
+
+                val map1 =
+                  GameMap(map.width, map.height, map.tiles, units1)
+
+                if (not(alive(def1))) {
+                  printString("Defender defeated.\n")
+                  runMenu(map1, Some(att0), Nil(), None(), None())
+                } else {
+                  val canCounter =
+                    inRange(def1, def1.x, def1.y, att0, wDefNow)
+
+                  if (canCounter) {
+                    val pDef = previewPure(def1, att0, wDefNow, wAttNow)
+                    val r2   = resolveAttack(def1, att0, pDef)
+                    val att1 = applyDamage(att0, r2.damage)
+
+                    printString(
+                      "DEFENDER: " ++
+                      (if (r2.hit) "HIT" else "MISS") ++
+                      (if (r2.crit) " (CRIT)" else "") ++
+                      " dmg=" ++ r2.damage.show ++ "\n"
+                    )
+
+                    val units2 =
+                      replaceUnit(map1.units, cs.attackerX, cs.attackerY, att1)
+
+                    val map2   = GameMap(map1.width, map1.height, map1.tiles, units2)
+
+                    runMenu(map2, Some(att1), Nil(), None(), None())
+                  } else {
+                    printString("No counterattack.\n")
+                    runMenu(map1, Some(att0), Nil(), None(), None())
+                  }
+                }
+            }
+        }
+    }
+  } with roll { max =>
+  val m: Int = if (max <= 0) 1 else max
+  val r: Int = randInt(m)   
+  resume(r)
+}
+
+
+
+  
 
   }
 

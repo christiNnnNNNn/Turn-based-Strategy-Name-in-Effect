@@ -1,4 +1,15 @@
 
 import src/model
+record CombatState(
+  attacker: gameUnbit,
+  defender: gameUnbit
+
+)
+
+record TargetEntry(
+  symbol: String,
+  index: Int,
+  unit: gameUnbit
+)
 
 

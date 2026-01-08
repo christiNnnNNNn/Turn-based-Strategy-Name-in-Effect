@@ -70,7 +70,18 @@ def parseDamageType(s: String): DamageType =
   if (s == "magical") Magic()
   else Physical()
 
-
+def parseRange(s: String): (Int, Int) = {
+  val comma = s.indexOf(",")
+  comma match {
+    case Some(i) =>
+      val a = s.substring(0, i).trim()
+      val b = s.substring(i + 1).trim()
+      (toInt1(a), toInt1(b))
+    case None() =>
+      val x = toInt1(s.trim())
+      (x, x)
+  }
+}
 
 
 
@@ -107,6 +118,7 @@ def parseMap(text: String): GameMap = {
   val wHit    = ref[Int](0)
   val wUses   = ref[Int](0)
   val wCrit   = ref[Int](0)
+  val wRange   = ref[(Int,Int)]((0,0))
   val lines = text.split("\n")
 
   lines.foreach { line =>
@@ -168,6 +180,7 @@ else if (readingWeapons.get()) {
           wHit.set(0)
           wUses.set(0)
           wCrit.set(0)
+          wRange.set((0,0))
         }
 
         else if (trimmed.indexOf("</weapon>") is Some(_)) {
@@ -181,6 +194,7 @@ else if (readingWeapons.get()) {
                 wHit.get(),
                 wUses.get(),
                 wCrit.get(),
+                wRange.get(),
                 Nil()
               ),
               weapons.get()
@@ -210,6 +224,9 @@ else if (readingWeapons.get()) {
 
           val crit = between(trimmed, "<crit>", "</crit>")
           if (crit.length() > 0) wCrit.set(toInt1(crit))
+
+           val range = between(trimmed, "<range>", "</range>")
+          if (range.length() > 0) wRange.set(parseRange(range))
         }
       }
       if (trimmed.indexOf("<unit>") is Some(_)) {
