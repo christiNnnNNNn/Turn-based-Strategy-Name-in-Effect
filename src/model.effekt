@@ -30,7 +30,10 @@ record gameUnbit(
 
   // --- Weapons ---
   weapons: List[Weapon], // All weapons the unit carries
-  activeWeapon: Int      // Index into weapons list (0-based)
+  activeWeapon: Int,      // Index into weapons list (0-based)
+
+  moved: Bool,
+  symbol: String  // the graphical idenfier off the unit on the map
 )
 
 
@@ -88,3 +91,22 @@ def getActiveWeapon(u: gameUnbit): Option[Weapon] = {
 
   loop(u.weapons, u.activeWeapon)
 }
+def isAlive(u: gameUnbit): Bool =
+  u.hp > 0
+
+def removeDead(units: List[gameUnbit]): List[gameUnbit] =
+  units match {
+    case Nil() => Nil()
+    case Cons(u, rest) =>
+      val tail = removeDead(rest)
+      if (isAlive(u)) Cons(u, tail) else tail
+  }
+def cleanupMap(m: GameMap): GameMap =
+  GameMap(m.width, m.height, m.tiles, removeDead(m.units))
+def sideHasUnits(units: List[gameUnbit], side: String): Bool =
+  units match {
+    case Nil() => false
+    case Cons(u, rest) =>
+      if (u.side == side && isAlive(u)) true
+      else sideHasUnits(rest, side)
+  }

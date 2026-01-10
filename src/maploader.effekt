@@ -42,6 +42,36 @@ def toInt1(s: String): Int =
   else
     val first = s.substring(0, 1)   
     charToDigit(first)
+def digit(c: String): Int =
+  if (c == "0") 0
+  else if (c == "1") 1
+  else if (c == "2") 2
+  else if (c == "3") 3
+  else if (c == "4") 4
+  else if (c == "5") 5
+  else if (c == "6") 6
+  else if (c == "7") 7
+  else if (c == "8") 8
+  else if (c == "9") 9
+  else 0
+
+def ptoInt(s: String): Int = {
+  val t = s.trim()
+
+  def loop(i: Int, acc: Int): Int =
+    if (i >= t.length()) acc
+    else {
+      val ch = t.substring(i, i + 1)
+      loop(i + 1, acc * 10 + digit(ch))
+    }
+
+  if (t.length() == 0) 0
+  else if (t.substring(0, 1) == "-")
+    0 - loop(1, 0)
+  else
+    loop(0, 0)
+}
+
 
 def charToDigit(c: String): Int =
   if (c == "0") 0
@@ -76,9 +106,9 @@ def parseRange(s: String): (Int, Int) = {
     case Some(i) =>
       val a = s.substring(0, i).trim()
       val b = s.substring(i + 1).trim()
-      (toInt1(a), toInt1(b))
+      (ptoInt(a), ptoInt(b))
     case None() =>
-      val x = toInt1(s.trim())
+      val x = ptoInt(s.trim())
       (x, x)
   }
 }
@@ -103,6 +133,7 @@ def parseMap(text: String): GameMap = {
   val curAgility   = ref[Int](0)
   val curLuck      = ref[Int](0)
   val curMovement  = ref[Int](0)
+  val curSymbol = ref[String]("")
 
   val readingMap   = ref(false)
   val readingUnits = ref(false)
@@ -214,16 +245,16 @@ else if (readingWeapons.get()) {
           if (d.length() > 0) wDmg.set(parseDamageType(d))
 
           val atk = between(trimmed, "<attack>", "</attack>")
-          if (atk.length() > 0) wAtk.set(toInt1(atk))
+          if (atk.length() > 0) wAtk.set(ptoInt(atk))
 
           val hit = between(trimmed, "<hit>", "</hit>")
-          if (hit.length() > 0) wHit.set(toInt1(hit))
+          if (hit.length() > 0) wHit.set(ptoInt(hit))
 
           val uses = between(trimmed, "<uses>", "</uses>")
-          if (uses.length() > 0) wUses.set(toInt1(uses))
+          if (uses.length() > 0) wUses.set(ptoInt(uses))
 
           val crit = between(trimmed, "<crit>", "</crit>")
-          if (crit.length() > 0) wCrit.set(toInt1(crit))
+          if (crit.length() > 0) wCrit.set(ptoInt(crit))
 
            val range = between(trimmed, "<range>", "</range>")
           if (range.length() > 0) wRange.set(parseRange(range))
@@ -242,6 +273,7 @@ else if (readingWeapons.get()) {
         curAgility.set(0)
         curLuck.set(0)
         curMovement.set(0)
+        curSymbol.set("")
         weapons.set(Nil())
       }
 
@@ -270,9 +302,10 @@ else if (readingWeapons.get()) {
               curAgility.get(),
               curLuck.get(),
               curMovement.get(),
-
               reverse(weapons.get()),
-              0
+              0,
+              false,
+              curSymbol.get()
           )
 
 ,
@@ -287,38 +320,41 @@ else if (readingWeapons.get()) {
         val side = between(trimmed, "<side>", "</side>")
         if (side.length() > 0) curSide.set(side)
 
+        val sym = between(trimmed, "<symbol>", "</symbol>")
+        if (sym.length() > 0) curSymbol.set(sym)
+
         val xs = between(trimmed, "<x>", "</x>")
-        if (xs.length() > 0) curX.set(toInt1(xs))
+        if (xs.length() > 0) curX.set(ptoInt(xs))
 
         val ys = between(trimmed, "<y>", "</y>")
-        if (ys.length() > 0) curY.set(toInt1(ys))
+        if (ys.length() > 0) curY.set(ptoInt(ys))
 
         val hp = between(trimmed, "<hp>", "</hp>")
-        if (hp.length() > 0) curHP.set(toInt1(hp))
+        if (hp.length() > 0) curHP.set(ptoInt(hp))
 
         val str = between(trimmed, "<strength>", "</strength>")
-        if (str.length() > 0) curStrength.set(toInt1(str))
+        if (str.length() > 0) curStrength.set(ptoInt(str))
 
         val mag = between(trimmed, "<magic>", "</magic>")
-        if (mag.length() > 0) curMagic.set(toInt1(mag))
+        if (mag.length() > 0) curMagic.set(ptoInt(mag))
 
         val deff = between(trimmed, "<defense>", "</defense>")
-        if (deff.length() > 0) curDefense.set(toInt1(deff))
+        if (deff.length() > 0) curDefense.set(ptoInt(deff))
 
         val res = between(trimmed, "<resistance>", "</resistance>")
-        if (res.length() > 0) curResistance.set(toInt1(res))
+        if (res.length() > 0) curResistance.set(ptoInt(res))
 
         val pre = between(trimmed, "<precision>", "</precision>")
-        if (pre.length() > 0) curPrecision.set(toInt1(pre))
+        if (pre.length() > 0) curPrecision.set(ptoInt(pre))
 
         val agi = between(trimmed, "<agility>", "</agility>")
-        if (agi.length() > 0) curAgility.set(toInt1(agi))
+        if (agi.length() > 0) curAgility.set(ptoInt(agi))
 
         val luck = between(trimmed, "<luck>", "</luck>")
-        if (luck.length() > 0) curLuck.set(toInt1(luck))
+        if (luck.length() > 0) curLuck.set(ptoInt(luck))
 
         val mov = between(trimmed, "<movement>", "</movement>")
-        if (mov.length() > 0) curMovement.set(toInt1(mov))
+        if (mov.length() > 0) curMovement.set(ptoInt(mov))
       }
     }
   }

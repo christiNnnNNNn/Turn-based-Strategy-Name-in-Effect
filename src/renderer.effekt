@@ -3,7 +3,7 @@ module renderer
 import src/model
 import src/Movement
 def dbg(s: String): Unit = printString("[DBG] " ++ s ++ "\n")
-
+def ansiGray(s: String): String = "\u001b[90m" ++ s ++ "\u001b[0m"
 
 type MoveState {
   Moving(
@@ -16,7 +16,8 @@ type MoveState {
   )
 }
 effect DrawTile(x: Int, y: Int, fill: String, outline: String): Unit
-effect DrawUnit(x: Int, y: Int, color: String): Unit
+effect DrawUnit(x: Int, y: Int, ch: String, color: String): Unit
+
 effect HighlightTile(x: Int, y: Int, color: String): Unit
 record Cell(char: String, fg: String, bg: String)
 type Buffer = List[List[Cell]]
@@ -42,7 +43,7 @@ def printWeapons(u: gameUnbit): Unit = {
       case Nil() => ()
       case Cons(w, rest) =>
         val marker =
-          if (idx == u.activeWeapon) "▶ " else "  "
+          if (idx == u.activeWeapon) "-> " else "  "
 
         w.range match {
   case (r1, r2) =>
@@ -69,6 +70,7 @@ def ansiFg(c: String): String =
     case "blue"   => "\u001b[34m"
     case "yellow" => "\u001b[33m"
     case "red"   => "\u001b[41m"
+    case "gray"   => "\u001b[90m" 
     case _        => "\u001b[37m"
   }
 
@@ -192,14 +194,14 @@ reachable.foreach { p =>
           case Some(s) =>
             if (s.x == u.x && s.y == u.y)
               "yellow"
-            else if (u.side == "player")
-              "blue"
+           else if (u.side == "player")
+              (if (u.moved) "gray" else "blue")
             else
               "red"
 
           case None() =>
-            if (u.side == "player")
-              "blue"
+             if (u.side == "player")
+              (if (u.moved) "gray" else "blue")
             else
               "red"
         }
@@ -227,13 +229,18 @@ reachable.foreach { p =>
     )
     resume(())
   }
-  with DrawUnit { (x, y, color) =>
-    val bg = getCell(buffer.get(), x, y).bg
-    buffer.set(
-      setCell(buffer.get(), x, y, Cell("@", color, bg))
-    )
-    resume(())
-  }
+  with DrawUnit { (x, y, ch, color) =>
+  val bg = getCell(buffer.get(), x, y).bg
+  val c =
+    if (ch.length() == 0) "?"
+    else ch.substring(0, 1)
+
+  buffer.set(
+    setCell(buffer.get(), x, y, Cell(c, color, bg))
+  )
+  resume(())
+}
+
 
 
 
@@ -267,5 +274,10 @@ def renderMap(map: GameMap): Unit / { DrawTile } = {
 
 
 def renderUnit(u: gameUnbit, color: String): Unit / { DrawUnit } =
-  do DrawUnit(u.x, u.y, color)
+  val ch =
+    if (u.symbol.length() == 0) "?"
+    else u.symbol.substring(0, 1)
+  do DrawUnit(u.x, u.y, ch, color)
+
+
  
