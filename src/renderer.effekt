@@ -1,7 +1,7 @@
 module renderer
 
 import src/model
-import src/Movement
+import src/movement
 def dbg(s: String): Unit = printString("[DBG] " ++ s ++ "\n")
 def ansiGray(s: String): String = "\u001b[90m" ++ s ++ "\u001b[0m"
 
