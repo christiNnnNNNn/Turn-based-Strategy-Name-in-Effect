@@ -1,0 +1,2 @@
+effect ParseError(msg: String): Unit
+effect ParseWarn(msg: String): Unit
