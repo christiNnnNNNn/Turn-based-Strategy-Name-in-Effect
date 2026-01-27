@@ -183,6 +183,14 @@ def parseMap(text: String): GameMap = {
 
           if (ch == "f")      row = Cons(TileFloor(), row)
           else if (ch == "w") row = Cons(TileWall(), row)
+          else if (ch == "t") row = Cons(TileForest(), row)
+          else if (ch == "s") row = Cons(TileSand(), row)
+          else if (ch == "h") row = Cons(TileHills(), row)
+          else if (ch == "m") row = Cons(TileMarsh(), row)
+          else {
+            row = Cons(TileWall(), row)  //  fallback
+          }
+
 
           i = i + 1
         }

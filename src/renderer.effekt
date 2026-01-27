@@ -76,12 +76,18 @@ def ansiFg(c: String): String =
 
 def ansiBg(c: String): String =
   c match {
+    case "white"  => "\u001b[47m"
+    case "yellow" => "\u001b[43m"
+    case "brown"  => "\u001b[48;5;94m"   
+    case "purple" => "\u001b[45m"
+
     case "green" => "\u001b[42m"
     case "gray"  => "\u001b[100m"
     case "blue"  => "\u001b[44m"
     case "red"   => "\u001b[41m"
     case _       => "\u001b[40m"
   }
+
 
 def ansiReset(): String = "\u001b[0m"
 
@@ -241,18 +247,6 @@ reachable.foreach { p =>
   resume(())
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 def renderMap(map: GameMap): Unit / { DrawTile } = {
   var y = 0
   map.tiles.foreach { row =>
@@ -260,8 +254,12 @@ def renderMap(map: GameMap): Unit / { DrawTile } = {
     row.foreach { tile =>
       val fill =
         tile match {
-          case TileFloor() => "green"
-          case TileWall()  => "gray"
+          case TileFloor()  => "white"
+          case TileWall()   => "gray"
+          case TileForest() => "green"
+          case TileSand()   => "yellow"
+          case TileHills()  => "brown"
+          case TileMarsh()  => "purple"
         }
 
       do DrawTile(x, y, fill, "black")
@@ -270,8 +268,6 @@ def renderMap(map: GameMap): Unit / { DrawTile } = {
     y = y + 1
   }
 }
-
-
 
 def renderUnit(u: gameUnbit, color: String): Unit / { DrawUnit } =
   val ch =

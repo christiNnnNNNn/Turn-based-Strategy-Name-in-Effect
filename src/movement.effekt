@@ -163,6 +163,10 @@ def withGroundRules[R](
     val terrainOK =
       tileAt(map, x, y) match {
         case TileFloor() => true
+        case TileSand()   => true
+        case TileHills()  => true
+        case TileForest() => true
+        case TileMarsh()  => true
         case TileWall()  => false
       }
 
@@ -176,6 +180,10 @@ def withGroundRules[R](
     resume(
       tileAt(map, x, y) match {
         case TileFloor() => 1
+        case TileSand()   => 2
+        case TileHills()  => 2
+        case TileForest() => 3
+        case TileMarsh()  => 3
         case TileWall()  => 999
       }
     )
@@ -198,7 +206,11 @@ def withGroundMovement(
 
     val terrainOK =
       tileAt(map, x, y) match {
-        case TileFloor() => true
+         case TileFloor() => true
+        case TileSand()   => true
+        case TileHills()  => true
+        case TileForest() => true
+        case TileMarsh()  => true
         case TileWall()  => false
       }
 
@@ -212,6 +224,10 @@ def withGroundMovement(
     resume(
       tileAt(map, x, y) match {
         case TileFloor() => 1
+        case TileSand()   => 2
+        case TileHills()  => 2
+        case TileForest() => 3
+        case TileMarsh()  => 3
         case TileWall()  => 999
       }
     )

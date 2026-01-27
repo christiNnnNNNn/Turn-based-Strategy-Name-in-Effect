@@ -1,6 +1,15 @@
 module model
 
-type Tile { TileFloor(); TileWall() }
+type Tile {
+  TileFloor()   // 'f' white/ neutral tile 
+  TileWall()    // 'w' gray / impassable
+
+  TileForest()  // 't' green, cost 3, defensive bonus
+  TileSand()    // 's' yellow, cost 2
+  TileHills()   // 'h' brown, cost 2, defensive bonus (different)
+  TileMarsh()   // 'm' purple, cost 3, defensive debuff (higher hit)
+}
+
 type MovementKind {
   Ground()
   Flying()

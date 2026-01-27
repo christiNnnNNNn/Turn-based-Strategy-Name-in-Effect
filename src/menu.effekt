@@ -10,11 +10,6 @@ import string
 
 extern type JSConsole
 
-
-
-
-
-
 extern def readFile(path: String) at io: String =
   jsNode """
     require('fs').readFileSync(${path}, 'utf8')
@@ -684,13 +679,6 @@ def runMenu(
   }
 }
 
-
-
-
-
-
-
- 
   val buffer = ref(makeBuffer(map.width, map.height))
   
   withConsole(buffer, map, selected, reachable, moveState)
@@ -707,9 +695,7 @@ def runMenu(
   case None() => ()
 }
   printBuffer(buffer.get())
-   
- 
-  
+
   val c = newConsole()
   val line = readLine(c)
   closeConsole(c)
@@ -718,107 +704,107 @@ def runMenu(
   val action = parseInput(line,combatState, moveState)
   action match {
     case Quit() =>
-    printString("Bye!\n")
-    ()
+      printString("Bye!\n")
+      ()
     case SelectUnit(x, y) =>
-  dbg("SelectUnit(" ++ x.show ++ "," ++ y.show ++ ")")
+      dbg("SelectUnit(" ++ x.show ++ "," ++ y.show ++ ")")
 
-  val selOpt = unitAt(map.units, x, y)
+      val selOpt = unitAt(map.units, x, y)
 
-  dbg(
-    "SelectUnit result: " ++
-    (selOpt match {
-      case Some(_) => "Some(unit)"
-      case None()  => "None"
-    })
-  )
-  val newSelected =
-  selOpt match {
-    case Some(u) =>
-      if (u.side == "player" && u.moved) {
-        printString("That unit already moved this turn.\n")
-        None()
-      } else Some(u)
-    case None() =>
-      None()
-  }
-  
-  runMenu(
-    map,
-    newSelected,
-    Nil(),        
-    None(),
-    None()       
-  )
+      dbg(
+        "SelectUnit result: " ++
+        (selOpt match {
+          case Some(_) => "Some(unit)"
+          case None()  => "None"
+        })
+      )
+      val newSelected =
+      selOpt match {
+        case Some(u) =>
+          if (u.side == "player" && u.moved) {
+            printString("That unit already moved this turn.\n")
+            None()
+          } else Some(u)
+        case None() =>
+          None()
+      }
+      
+      runMenu(
+        map,
+        newSelected,
+        Nil(),        
+        None(),
+        None()       
+      )
    case MoveCursor(dx, dy) =>
-  moveState match {
-    case Some(Moving(u, sx, sy, cx, cy, rem)) =>
-      val nx = cx + dx
-      val ny = cy + dy
+    moveState match {
+      case Some(Moving(u, sx, sy, cx, cy, rem)) =>
+        val nx = cx + dx
+        val ny = cy + dy
 
-      val newRem =
-        withGroundRules(map, u.x, u.y) {
-          tryMove(nx, ny, rem)
-        }
+        val newRem =
+          withGroundRules(map, u.x, u.y) {
+            tryMove(nx, ny, rem)
+          }
 
-      val nextState =
-        if (newRem >= 0 && newRem < rem)
-          Some(Moving(u, sx, sy, nx, ny, newRem))
-        else
-          moveState
+        val nextState =
+          if (newRem >= 0 && newRem < rem)
+            Some(Moving(u, sx, sy, nx, ny, newRem))
+          else
+            moveState
 
-      runMenu(map, selected, reachable, nextState,None())
-    case None() =>
-      runMenu(map, selected, reachable, None(),None())
-  }
+        runMenu(map, selected, reachable, nextState,None())
+      case None() =>
+        runMenu(map, selected, reachable, None(),None())
+    }
 
 
   case CancelMove() =>
-  runMenu(map, selected, reachable, None(), None())
-  case ConfirmMove() =>    
-  printString("[DBG] ConfirmMove pressed\n")     
-    moveState match {
-      case Some(Moving(u, sx, sy, cx, cy, _)) =>
-        printString(
-        "[DBG] Commit cursor at (" ++ cx.show ++ "," ++ cy.show ++ ")\n"
-      )
-        val moved =
-          gameUnbit(
-            u.side,
-            cx, cy,
-            u.hp,
-            u.strength,
-            u.magic,
-            u.defense,
-            u.resistance,
-            u.precision,
-            u.agility,
-            u.luck,
-            u.movement,
-            u.weapons,
-            u.activeWeapon,
-            true,
-            u.symbol
-          )
-        printString(
-  "[DBG] New unit position = (" ++ moved.x.show ++ "," ++ moved.y.show ++ ")\n"
-)
-         val newUnits =
-        replaceUnit(map.units, sx, sy, moved)
-
-      val newMap =
-        GameMap(map.width, map.height, map.tiles, newUnits)
-        map.units.foreach { u =>
-  printString(
-    "[DBG] render unit at (" ++ u.x.show ++ "," ++ u.y.show ++ ")\n"
+    runMenu(map, selected, reachable, None(), None())
+    case ConfirmMove() =>    
+    printString("[DBG] ConfirmMove pressed\n")     
+      moveState match {
+        case Some(Moving(u, sx, sy, cx, cy, _)) =>
+          printString(
+          "[DBG] Commit cursor at (" ++ cx.show ++ "," ++ cy.show ++ ")\n"
+        )
+          val moved =
+            gameUnbit(
+              u.side,
+              cx, cy,
+              u.hp,
+              u.strength,
+              u.magic,
+              u.defense,
+              u.resistance,
+              u.precision,
+              u.agility,
+              u.luck,
+              u.movement,
+              u.weapons,
+              u.activeWeapon,
+              true,
+              u.symbol
+            )
+          printString(
+    "[DBG] New unit position = (" ++ moved.x.show ++ "," ++ moved.y.show ++ ")\n"
   )
-}
+          val newUnits =
+          replaceUnit(map.units, sx, sy, moved)
 
-      runMenu(newMap, Some(moved), Nil(), None(), None())
+        val newMap =
+          GameMap(map.width, map.height, map.tiles, newUnits)
+          map.units.foreach { u =>
+    printString(
+      "[DBG] render unit at (" ++ u.x.show ++ "," ++ u.y.show ++ ")\n"
+    )
+  }
 
-      case None() =>
-        runMenu(map, selected, reachable, None(), None())
-    }
+        runMenu(newMap, Some(moved), Nil(), None(), None())
+
+        case None() =>
+          runMenu(map, selected, reachable, None(), None())
+      }
 
    
   case ShowMovement() =>
@@ -865,109 +851,108 @@ def runMenu(
       runMenu(map, selected, reachable, moveState, None())
   }
   case ListTargets() =>
-  selected match {
-    case Some(att) =>
-    if (att.side != "player") {
-        printString("You can only attack with player units.\n")
-        runMenu(map, selected, reachable, moveState, combatState)
-      } else {
-      activeWeapon(att) match {
-        case Some(wAtt) =>
-          val (attX, attY) =
-          moveState match {
-            case Some(Moving(_, _, _, cx, cy, _)) => (cx, cy)
-            case None()                           => (att.x, att.y)
-          }
-
-        val ts = collectTargets(att, attX, attY, map.units, wAtt)
-
-        if (ts is Nil()) {
-          printString("No targets in range.\n")
-          runMenu(map, selected, reachable, moveState,None())
+    selected match {
+      case Some(att) =>
+      if (att.side != "player") {
+          printString("You can only attack with player units.\n")
+          runMenu(map, selected, reachable, moveState, combatState)
         } else {
-          printString("\n=== TARGETS (press number) ===\n")
-          printTargets(ts, 1)
+        activeWeapon(att) match {
+          case Some(wAtt) =>
+            val (attX, attY) =
+            moveState match {
+              case Some(Moving(_, _, _, cx, cy, _)) => (cx, cy)
+              case None()                           => (att.x, att.y)
+            }
 
-          val c2 = newConsole()
-          val line2 = readLine(c2)
-          closeConsole(c2)
+          val ts = collectTargets(att, attX, attY, map.units, wAtt)
+
+          if (ts is Nil()) {
+            printString("No targets in range.\n")
+            runMenu(map, selected, reachable, moveState,None())
+          } else {
+            printString("\n=== TARGETS (press number) ===\n")
+            printTargets(ts, 1)
+
+            val c2 = newConsole()
+            val line2 = readLine(c2)
+            closeConsole(c2)
 
 
-            val idxOpt = parseIntOpt(line2.trim())
-            idxOpt match {
-              case Some(k) =>
-                val idx0 = k - 1
-                val defOpt = listGet(ts, idx0)   
-                defOpt match {
-                  case Some(target) =>
-                    activeWeapon(target) match {
-                      case Some(wDef) =>
-
-                       
-                        val (sx, sy) =
-                          moveState match {
-                            case Some(Moving(_, sx0, sy0, _, _, _)) => (sx0, sy0)
-                            case None() => (att.x, att.y)
-                          }
-
-                        val (ax, ay) =
-                          moveState match {
-                            case Some(Moving(_, _, _, cx, cy, _)) => (cx, cy)
-                            case None() => (att.x, att.y)
-                          }
+              val idxOpt = parseIntOpt(line2.trim())
+              idxOpt match {
+                case Some(k) =>
+                  val idx0 = k - 1
+                  val defOpt = listGet(ts, idx0)   
+                  defOpt match {
+                    case Some(target) =>
+                      activeWeapon(target) match {
+                        case Some(wDef) =>
 
                         
-                        val attAtCursor =
-                          gameUnbit(
-                            att.side,
-                            ax, ay,
-                            att.hp,
-                            att.strength, att.magic, att.defense, att.resistance,
-                            att.precision, att.agility, att.luck,
-                            att.movement,
-                            att.weapons,
-                            att.activeWeapon,
-                            att.moved,
-                            att.symbol
-                          )
+                          val (sx, sy) =
+                            moveState match {
+                              case Some(Moving(_, sx0, sy0, _, _, _)) => (sx0, sy0)
+                              case None() => (att.x, att.y)
+                            }
 
-                        val p = previewPure(attAtCursor, target, wAtt, wDef)
+                          val (ax, ay) =
+                            moveState match {
+                              case Some(Moving(_, _, _, cx, cy, _)) => (cx, cy)
+                              case None() => (att.x, att.y)
+                            }
 
-                        val cs =
-                          CombatState(attAtCursor, sx, sy, ax, ay, target, wAtt, wDef, p)
+                          
+                          val attAtCursor =
+                            gameUnbit(
+                              att.side,
+                              ax, ay,
+                              att.hp,
+                              att.strength, att.magic, att.defense, att.resistance,
+                              att.precision, att.agility, att.luck,
+                              att.movement,
+                              att.weapons,
+                              att.activeWeapon,
+                              att.moved,
+                              att.symbol
+                            )
 
-                        printPreview(cs)
-                        runMenu(map, selected, reachable, moveState, Some(cs))
+                          val p = previewPure(attAtCursor, target, wAtt, wDef)
 
-                      case None() =>
-                        printString("Defender has no weapon.\n")
-                        runMenu(map, selected, reachable, moveState, combatState)
-                    }
+                          val cs =
+                            CombatState(attAtCursor, sx, sy, ax, ay, target, wAtt, wDef, p)
 
-                    
-                  case None() =>
-                    printString("Invalid target.\n")
-                    runMenu(map, selected, reachable, moveState, None())
-                }
+                          printPreview(cs)
+                          runMenu(map, selected, reachable, moveState, Some(cs))
 
-              case None() =>
-                printString("Invalid number.\n")
-                runMenu(map, selected, reachable, moveState, None())
+                        case None() =>
+                          printString("Defender has no weapon.\n")
+                          runMenu(map, selected, reachable, moveState, combatState)
+                      }
+
+                      
+                    case None() =>
+                      printString("Invalid target.\n")
+                      runMenu(map, selected, reachable, moveState, None())
+                  }
+
+                case None() =>
+                  printString("Invalid number.\n")
+                  runMenu(map, selected, reachable, moveState, None())
+              }
             }
-          }
 
-        case None() =>
-          printString("No active weapon.\n")
-          runMenu(map, selected, reachable, moveState, None())
-      }
-      }
-    case None() =>
-      printString("No unit selected.\n")
-      runMenu(map, selected, reachable, moveState, None())
-  }
+          case None() =>
+            printString("No active weapon.\n")
+            runMenu(map, selected, reachable, moveState, None())
+        }
+        }
+      case None() =>
+        printString("No unit selected.\n")
+        runMenu(map, selected, reachable, moveState, None())
+    }
   case CancelCombat() =>
- 
-  runMenu(map, selected, reachable, moveState, None())
+    runMenu(map, selected, reachable, moveState, None())
 
 case ConfirmCombat() =>
   try {
