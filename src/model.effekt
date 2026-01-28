@@ -10,16 +10,21 @@ type Tile {
   TileMarsh()   // 'm' purple, cost 3, defensive debuff (higher hit)
 }
 
-type MovementKind {
-  Ground()
-  Flying()
-}
+
 type UnitClass {
   Soldier()
   Armor()
   Knight()
   Flyer()
 }
+
+type MoveMode {
+  Foot()
+  Heavy()
+  Cavalry()
+  Flying()
+}
+
 def showUnitClass(c: UnitClass): String =
   c match {
     case Soldier() => "Soldier"
@@ -85,10 +90,12 @@ type DamageType {
 // --- Special effects that can be attached to weapons
 type WeaponMod {
   NoneMod()
-  Poison(chance: Int)      // percent chance
-  Burn(chance: Int)
-  ArmorBreak(amount: Int)  // flat defense reduction
+  ArmorBreak(amount: Int)     // flat defense reduction to defender in preview (and later apply as status)
+  ExtraCrit(amount: Int)      // +crit
+  MountedBonus(amount: Int)   // +damage if attacker is Knight
+  AntiArmor(amount: Int)      // +damage vs Armor
 }
+
 
 // --- Weapon record
 record Weapon(

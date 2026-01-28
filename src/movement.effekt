@@ -30,8 +30,28 @@ def tileAt(map: GameMap, x: Int, y: Int): Tile =
         case Some(t) => t
       }
   }
+def classMoveMode(c: UnitClass): MoveMode =
+  c match {
+    case Soldier() => Foot()
+    case Armor()   => Heavy()
+    case Knight()  => Cavalry()
+    case Flyer()   => Flying()
+  }
+def terrainCost(t: Tile): Int =
+  t match {
+    case TileFloor()  => 1
+    case TileSand()   => 2
+    case TileHills()  => 2
+    case TileForest() => 3
+    case TileMarsh()  => 3
+    case TileWall()   => 999
+  }
 
-
+def terrainPassableForFoot(t: Tile): Bool =
+  t match {
+    case TileWall() => false
+    case _          => true
+  }
  
 def tryMove(
   x: Int,
@@ -148,93 +168,79 @@ def expand(
 
 
 
-def withGroundRules[R](
+def withUnitMovementRules[R](
   map: GameMap,
+  u: gameUnbit,
   startX: Int,
   startY: Int
 ) { program: () => R / { canEnter, moveCost } } : R =
-  try {
-    program()
-  }
+  try { program() }
   with canEnter { (x, y) =>
     val inBounds =
-      x >= 0 && y >= 0 &&
-      x < map.width && y < map.height
-
-    val terrainOK =
-      tileAt(map, x, y) match {
-        case TileFloor() => true
-        case TileSand()   => true
-        case TileHills()  => true
-        case TileForest() => true
-        case TileMarsh()  => true
-        case TileWall()  => false
-      }
+      x >= 0 && y >= 0 && x < map.width && y < map.height
 
     val occupied =
       unitAt(map.units, x, y).isDefined() &&
       not(x == startX && y == startY)
 
-    resume(inBounds && terrainOK && not(occupied))
+    if (not(inBounds) || occupied) resume(false)
+    else {
+      val tile = tileAt(map, x, y)
+      classMoveMode(u.class) match {
+
+        case Flying() =>
+
+          resume(tile match {  case _ => true })
+
+        case Foot() =>
+          resume(terrainPassableForFoot(tile))
+
+        case Cavalry() =>
+
+          resume(tile match {
+            case TileWall()   => false
+            case _            => true
+          })
+
+        case Heavy() =>
+
+          resume(tile match {
+            case TileWall()  => false
+            case _           => true
+          })
+      }
+    }
   }
   with moveCost { (x, y) =>
-    resume(
-      tileAt(map, x, y) match {
-        case TileFloor() => 1
-        case TileSand()   => 2
-        case TileHills()  => 2
-        case TileForest() => 3
-        case TileMarsh()  => 3
-        case TileWall()  => 999
-      }
-    )
+    val tile = tileAt(map, x, y)
+    classMoveMode(u.class) match {
+
+      case Flying() =>
+        resume(1)
+
+      case Heavy() =>
+        val base = terrainCost(tile)
+        if (base >= 999) resume(999) else resume(base + 1)
+
+      case Cavalry() =>
+        resume(tile match {
+          case TileFloor() => 1
+          case TileSand()  => 3
+          case TileHills() => 3
+          case TileForest() => 4
+          case TileMarsh()  => 4
+          case TileWall()   => 999
+        })
+
+      case Foot() =>
+        resume(terrainCost(tile))
+    }
   }
 
-
-
-
-def withGroundMovement(
-  map: GameMap,
-  u: gameUnbit
-): List[TilePos] =
-  try {
+def withGroundMovement(map: GameMap, u: gameUnbit): List[TilePos] =
+  withUnitMovementRules(map, u, u.x, u.y) {
     reachableTiles(u.x, u.y, u.movement)
   }
-  with canEnter { (x, y) =>
-    val inBounds =
-      x >= 0 && y >= 0 &&
-      x < map.width && y < map.height
-
-    val terrainOK =
-      tileAt(map, x, y) match {
-         case TileFloor() => true
-        case TileSand()   => true
-        case TileHills()  => true
-        case TileForest() => true
-        case TileMarsh()  => true
-        case TileWall()  => false
-      }
-
-    val occupied =
-      unitAt(map.units, x, y).isDefined() &&
-      not(x == u.x && y == u.y)
-
-    resume(inBounds && terrainOK && not(occupied))
-  }
-  with moveCost { (x, y) =>
-    resume(
-      tileAt(map, x, y) match {
-        case TileFloor() => 1
-        case TileSand()   => 2
-        case TileHills()  => 2
-        case TileForest() => 3
-        case TileMarsh()  => 3
-        case TileWall()  => 999
-      }
-    )
-  }
-
-
 
 def unitAt(
   units: List[gameUnbit],

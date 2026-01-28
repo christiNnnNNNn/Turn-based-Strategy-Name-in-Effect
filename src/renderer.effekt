@@ -55,7 +55,7 @@ def printWeapons(u: gameUnbit): Unit = {
       " HIT=" ++ w.hit.show ++
       " CRIT=" ++ w.crit.show ++
       " RNG=" ++ r1.show ++ "-" ++ r2.show ++
-      " Uses="++ w.uses.show++     "\n"
+      " Uses=" ++ w.uses.show ++     "\n"
     )
 }
 
@@ -70,7 +70,6 @@ def ansiFg(c: String): String =
     case "red"    => "\u001b[31m"
     case "blue"   => "\u001b[34m"
     case "yellow" => "\u001b[33m"
-    case "red"   => "\u001b[41m"
     case "gray"   => "\u001b[90m" 
     case _        => "\u001b[37m"
   }

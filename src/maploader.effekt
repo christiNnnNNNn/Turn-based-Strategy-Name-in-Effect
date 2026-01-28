@@ -72,7 +72,11 @@ def ptoInt(s: String): Int = {
   else
     loop(0, 0)
 }
-
+def parseWeaponMod(s: String): WeaponMod =
+  val t = s.trim()
+  if (t == "none") NoneMod()
+  else if (t == "armor_break") ArmorBreak(2) 
+  else NoneMod()
 
 def charToDigit(c: String): Int =
   if (c == "0") 0
@@ -145,6 +149,8 @@ def parseMap(text: String): GameMap = {
   val curMovement  = ref[Int](0)
   val curSymbol = ref[String]("")
   val curClass = ref[UnitClass](Soldier())
+  val readingMods = ref(false)
+  val curMods     = ref[List[WeaponMod]](Nil())
 
   val readingMap   = ref(false)
   val readingUnits = ref(false)
@@ -230,6 +236,8 @@ else if (readingWeapons.get()) {
           wUses.set(0)
           wCrit.set(0)
           wRange.set((0,0))
+          readingMods.set(false)
+          curMods.set(Nil())
         }
 
         else if (trimmed.indexOf("</weapon>") is Some(_)) {
@@ -244,7 +252,8 @@ else if (readingWeapons.get()) {
                 wUses.get(),
                 wCrit.get(),
                 wRange.get(),
-                Nil()
+                reverse(curMods.get())
+
               ),
               weapons.get()
             )
@@ -256,10 +265,10 @@ else if (readingWeapons.get()) {
           val n = between(trimmed, "<name>", "</name>")
           if (n.length() > 0) wName.set(n)
 
-          val t = between(trimmed, "<type>", "</type>")
+          val t = between(trimmed, "<kind>", "</kind>")
           if (t.length() > 0) wType.set(parseWeaponType(t))
 
-          val d = between(trimmed, "<damage>", "</damage>")
+          val d = between(trimmed, "<damageType>", "</damageType>")
           if (d.length() > 0) wDmg.set(parseDamageType(d))
 
           val atk = between(trimmed, "<attack>", "</attack>")
@@ -276,6 +285,19 @@ else if (readingWeapons.get()) {
 
            val range = between(trimmed, "<range>", "</range>")
           if (range.length() > 0) wRange.set(parseRange(range))
+
+          else if (trimmed.indexOf("<modifiers>") is Some(_)) {
+          readingMods.set(true)
+          }
+          else if (trimmed.indexOf("</modifiers>") is Some(_)) {
+            readingMods.set(false)
+          }
+          else if (readingWeapon.get() && readingMods.get()) {
+            val m = between(trimmed, "<modifier>", "</modifier>")
+            if (m.length() > 0) {
+              curMods.set(Cons(parseWeaponMod(m), curMods.get()))
+            }
+          }
         }
       }
       if (trimmed.indexOf("<unit>") is Some(_)) {

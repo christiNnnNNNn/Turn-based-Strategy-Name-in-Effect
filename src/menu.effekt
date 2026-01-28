@@ -72,29 +72,7 @@ def unitAtPos(
       if (u.x == x && u.y == y) Some(u)
       else unitAtPos(rest, x, y)
   }
-def tileAt(
-  tiles: List[List[Tile]],
-  x: Int,
-  y: Int
-): Tile =
-  tiles match {
-    case Nil() =>
-      TileWall()   
 
-    case Cons(row, rest) =>
-      if (y == 0) tileAtRow(row, x)
-      else tileAt(rest, x, y - 1)
-  }
-
-def tileAtRow(row: List[Tile], x: Int): Tile =
-  row match {
-    case Nil() =>
-      TileWall()
-
-    case Cons(t, rest) =>
-      if (x == 0) t
-      else tileAtRow(rest, x - 1)
-  }
 def printPreview(cs: CombatState): Unit =
   printString(
     "\n=== COMBAT PREVIEW ===\n" ++
@@ -485,7 +463,7 @@ def enemyPhase(map: GameMap): GameMap = {
                   // enemy strikes
                   activeWeapon(defU) match {
                     case None() =>
-                      val pE  = previewPure(e1, defU, wE, wE)
+                      val pE  = previewPure(mapMoved, e1, defU, wE, wE)
                       val r1  = resolveAttackPure(e1, defU, pE)
                       val def1 = applyDamage(defU, r1.damage)
 
@@ -500,7 +478,7 @@ def enemyPhase(map: GameMap): GameMap = {
                       GameMap(mapMoved.width, mapMoved.height, mapMoved.tiles, unitsAfter)
 
                     case Some(wP) =>
-                      val pE  = previewPure(e1, defU, wE, wP)
+                      val pE  = previewPure(mapMoved, e1, defU, wE, wP)
                       val r1  = resolveAttackPure(e1, defU, pE)
                       val def1 = applyDamage(defU, r1.damage)
 
@@ -526,7 +504,7 @@ def enemyPhase(map: GameMap): GameMap = {
                             map1
 
                           case Some(wPCur) =>
-                            val pC = previewPure(defCounter0, e1, wPCur, wE)
+                            val pC = previewPure(map1, defCounter0, e1, wPCur, wE)
                             val r2 = resolveAttackPure(defCounter0, e1, pC)
                             val e2 = applyDamage(e1, r2.damage)
 
@@ -747,7 +725,7 @@ def runMenu(
         val ny = cy + dy
 
         val newRem =
-          withGroundRules(map, u.x, u.y) {
+          withUnitMovementRules(map, u, u.x, u.y) {
             tryMove(nx, ny, rem)
           }
 
@@ -923,7 +901,8 @@ def runMenu(
                               att.class
                             )
 
-                          val p = previewPure(attAtCursor, target, wAtt, wDef)
+                          val p = previewPure(map, attAtCursor, target, wAtt, wDef)
+
 
                           val cs =
                             CombatState(attAtCursor, sx, sy, ax, ay, target, wAtt, wDef, p)
@@ -995,7 +974,7 @@ case ConfirmCombat() =>
                 runMenu(map, selected, reachable, None(), None())
 
               case Some(wDefNow) =>
-                val pAtt = previewPure(att0, def0, wAttNow, wDefNow)
+                val pAtt = previewPure(map, att0, def0, wAttNow, wDefNow)
                 val r1   = resolveAttack(att0, def0, pAtt)
                 val def1 = applyDamage(def0, r1.damage)
 
@@ -1025,7 +1004,7 @@ case ConfirmCombat() =>
                   
 
                   if (canCounter(def1, att0, wDefNow)) {
-                    val pDef = previewPure(def1, att0, wDefNow, wAttNow)
+                    val pDef = previewPure(map1, def1, att0, wDefNow, wAttNow)
                     val r2   = resolveAttack(def1, att0, pDef)
                     val att1 = applyDamage(att0, r2.damage)
 

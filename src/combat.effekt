@@ -1,9 +1,12 @@
 import src/model
+import src/movement
 effect roll(maxExclusive: Int): Int
 effect triangleBonus(attKind: WeaponKind, defKind: WeaponKind): (Int, Int)
 effect modifyDamage(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon, dmg: Int): Int
 effect modifyHit(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon, hit: Int): Int
 effect modifyCrit(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon, crit: Int): Int
+
+
 
 
 effect clamp0(n: Int): Int
@@ -19,11 +22,76 @@ record CombatPreview(
   hit: Int,
   crit: Int
 )
+def sumExtraCrit(mods: List[WeaponMod]): Int =
+  mods match {
+    case Nil() => 0
+    case Cons(m, rest) =>
+      m match {
+        case ExtraCrit(a) => a + sumExtraCrit(rest)
+        case _            => sumExtraCrit(rest)
+      }
+  }
 
+def sumArmorBreak(mods: List[WeaponMod]): Int =
+  mods match {
+    case Nil() => 0
+    case Cons(m, rest) =>
+      m match {
+        case ArmorBreak(a) => a + sumArmorBreak(rest)
+        case _             => sumArmorBreak(rest)
+      }
+  }
+
+def sumAntiArmor(mods: List[WeaponMod]): Int =
+  mods match {
+    case Nil() => 0
+    case Cons(m, rest) =>
+      m match {
+        case AntiArmor(a) => a + sumAntiArmor(rest)
+        case _            => sumAntiArmor(rest)
+      }
+  }
+
+def sumMountedBonus(mods: List[WeaponMod]): Int =
+  mods match {
+    case Nil() => 0
+    case Cons(m, rest) =>
+      m match {
+        case MountedBonus(a) => a + sumMountedBonus(rest)
+        case _               => sumMountedBonus(rest)
+      }
+  }
+  def terrainDmgDelta(map: GameMap, defU: gameUnbit): Int =
+  tileAt(map, defU.x, defU.y) match {
+    case TileForest() => -1
+    case TileHills()  => -1
+    case _            => 0
+  }
+
+def terrainHitDelta(map: GameMap, defU: gameUnbit): Int =
+  tileAt(map, defU.x, defU.y) match {
+    case TileForest() => -15
+    case TileHills()  => -10
+    case TileMarsh()  =>  15
+    case _            => 0
+  }
+
+def isBow(k: WeaponKind): Bool =
+  k match {
+    case Bow() => true
+    case _     => false
+  }
+
+def isFlyer(c: UnitClass): Bool =
+  c match {
+    case Flyer() => true
+    case _       => false
+  }
 def preview(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon)
   : CombatPreview / { triangleBonus, clamp0, modifyDamage, modifyHit, modifyCrit } =
 {
   val (triDmg, triHit) = do triangleBonus(wAtt.kind, wDef.kind)
+
 
   val atkStat =
     wAtt.damageType match {
@@ -37,7 +105,7 @@ def preview(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon)
       case Magic()    => deff.resistance
     }
 
-  val baseDmg = wAtt.attack + atkStat - defStat + triDmg
+  val baseDmg = wAtt.attack + atkStat - defStat + triDmg 
   val dmg     = do clamp0(do modifyDamage(att, deff, wAtt, wDef, baseDmg))
 
   val baseHit = wAtt.hit + att.precision - deff.agility + triHit
@@ -48,6 +116,7 @@ def preview(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon)
 
   CombatPreview(dmg, hit, crit)
 }
+
 
 record AttackResult(hit: Bool, crit: Bool, damage: Int)
 
@@ -75,29 +144,11 @@ def applyDamage(u: gameUnbit, dmg: Int): gameUnbit =
     u.symbol,
     u.class
   )
-def previewDefault(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon): CombatPreview / {} =
-  try { preview(att, deff, wAtt, wDef) }
-  with clamp0 { n => resume(if (n < 0) 0 else n) }
-  with triangleBonus { (ak, dk) =>
-    resume(
-      (ak, dk) match {
-        case (Sword(), Axe())   => (1, 15)
-        case (Axe(), Lance())   => (1, 15)
-        case (Lance(), Sword()) => (1, 15)
-        case (Axe(), Sword())   => (-1, -15)
-        case (Lance(), Axe())   => (-1, -15)
-        case (Sword(), Lance()) => (-1, -15)
-        case _ => (0, 0)
-      }
-    )
-  }
-  with modifyDamage { (a, d, wa, wd, dmg) => resume(dmg) }
-  with modifyHit    { (a, d, wa, wd, hit) => resume(hit) }
-  with modifyCrit   { (a, d, wa, wd, c)   => resume(c) }
+def previewPure(map: GameMap, att: gameUnbit, defU: gameUnbit, wAtt: Weapon, wDef: Weapon): CombatPreview / {} =
+  try { preview(att, defU, wAtt, wDef) }
 
-def previewPure(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon): CombatPreview / {} =
-  try { preview(att, deff, wAtt, wDef) }
   with clamp0 { n => resume(if (n < 0) 0 else n) }
+
   with triangleBonus { (ak, dk) =>
     resume(
       (ak, dk) match {
@@ -111,9 +162,44 @@ def previewPure(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon): Co
       }
     )
   }
-  with modifyDamage { (_, _, _, _, dmg) => resume(dmg) }
-  with modifyHit    { (_, _, _, _, hit) => resume(hit) }
-  with modifyCrit   { (_, _, _, _, c)   => resume(c) }
+
+  with modifyDamage { (a, d, wa, _, dmg0) =>
+
+    val dmg1 = dmg0 + terrainDmgDelta(map, d)
+
+    val dmg2 = dmg1 + sumArmorBreak(wa.mods)
+
+    val dmg3 =
+      d.class match {
+        case Armor() => dmg2 + sumAntiArmor(wa.mods)
+        case _       => dmg2
+      }
+
+    val dmg4 =
+      a.class match {
+        case Knight() => dmg3 + sumMountedBonus(wa.mods)
+        case _        => dmg3
+      }
+
+    val dmg5 =
+      if (isBow(wa.kind) && isFlyer(d.class))
+        dmg4 * 2
+      else
+        dmg4
+
+    resume(dmg5)
+  }
+
+  with modifyHit { (_, d, _, _, hit0) =>
+    val hit1 = hit0 + terrainHitDelta(map, d)
+    resume(hit1)
+  }
+
+  with modifyCrit { (_, _, wa, _, c0) =>
+    val c1 = c0 + sumExtraCrit(wa.mods)
+    resume(c1)
+  }
+
 
 
 def alive(u: gameUnbit): Bool = u.hp > 0
