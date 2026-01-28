@@ -8,7 +8,7 @@ import src/menu
 import io/console
 
 
-     def main() = {
+def main() = {
   val text = readFile("C:/Users/Christian/Documents/testMap.txt")
   val map  = parseMap(text)
 

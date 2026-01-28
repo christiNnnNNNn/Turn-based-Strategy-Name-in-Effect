@@ -19,7 +19,6 @@ def listGet[A](xs: List[A], i: Int): Option[A] =
   }
 
 
-
 def tileAt(map: GameMap, x: Int, y: Int): Tile =
   listGet(map.tiles, y) match {
     case None() =>
@@ -122,7 +121,9 @@ def expand(
           } else {
             val c = do moveCost(r.x, r.y)
             val nextRemaining = r.remaining - c
-
+            val reachable2 =
+              if (nextRemaining >= 0) Cons(TilePos(r.x, r.y), reachable)
+              else reachable
             val newSeen =
               updateSeen(seen, r.x, r.y, r.remaining)
 
@@ -135,7 +136,7 @@ def expand(
             expand(
               newFrontier,
               newSeen,
-              Cons(TilePos(r.x, r.y), reachable)
+              Cons(TilePos(r.x, r.y), reachable2)
             )
           }
         }

@@ -72,7 +72,8 @@ def applyDamage(u: gameUnbit, dmg: Int): gameUnbit =
     u.weapons,
     u.activeWeapon,
     u.moved,
-    u.symbol
+    u.symbol,
+    u.class
   )
 def previewDefault(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon): CombatPreview / {} =
   try { preview(att, deff, wAtt, wDef) }

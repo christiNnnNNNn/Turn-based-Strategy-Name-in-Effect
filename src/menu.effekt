@@ -138,7 +138,8 @@ def switchWeapon(
       u.weapons,
       newIndex,
       u.moved,
-      u.symbol       
+      u.symbol,
+      u.class       
     )
   else
     u
@@ -172,7 +173,8 @@ def resetMoved(units: List[gameUnbit]): List[gameUnbit] =
             u.weapons,
             u.activeWeapon,
             false,
-            u.symbol
+            u.symbol,
+            u.class
           )
         else
           u
@@ -257,7 +259,8 @@ def decWeaponUse(u: gameUnbit): gameUnbit =
         ws2,
         u.activeWeapon,
         u.moved,
-        u.symbol
+        u.symbol,
+        u.class
       )
   }
 
@@ -459,7 +462,8 @@ def enemyPhase(map: GameMap): GameMap = {
                   e0.movement,
                   e0.weapons, e0.activeWeapon,
                   e0.moved,
-                  e0.symbol
+                  e0.symbol,
+                  e0.class
                 )
             }
 
@@ -784,7 +788,8 @@ def runMenu(
               u.weapons,
               u.activeWeapon,
               true,
-              u.symbol
+              u.symbol,
+              u.class
             )
           printString(
     "[DBG] New unit position = (" ++ moved.x.show ++ "," ++ moved.y.show ++ ")\n"
@@ -914,7 +919,8 @@ def runMenu(
                               att.weapons,
                               att.activeWeapon,
                               att.moved,
-                              att.symbol
+                              att.symbol,
+                              att.class
                             )
 
                           val p = previewPure(attAtCursor, target, wAtt, wDef)
@@ -974,7 +980,8 @@ case ConfirmCombat() =>
             att0.weapons,
             att0.activeWeapon,
             true,
-            att0.symbol
+            att0.symbol,
+            att0.class
           )
         val def0 = cs.defender
 

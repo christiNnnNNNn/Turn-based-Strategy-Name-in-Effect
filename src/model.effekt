@@ -14,7 +14,19 @@ type MovementKind {
   Ground()
   Flying()
 }
-
+type UnitClass {
+  Soldier()
+  Armor()
+  Knight()
+  Flyer()
+}
+def showUnitClass(c: UnitClass): String =
+  c match {
+    case Soldier() => "Soldier"
+    case Armor()   => "Armor"
+    case Knight()  => "Knight"
+    case Flyer()   => "Flyer"
+  }
 record gameUnbit(
   
   side: String,        // "player" or "enemy"
@@ -42,7 +54,8 @@ record gameUnbit(
   activeWeapon: Int,      // Index into weapons list (0-based)
 
   moved: Bool,
-  symbol: String  // the graphical idenfier off the unit on the map
+  symbol: String,  // the graphical idenfier off the unit on the map
+  class: UnitClass
 )
 
 
