@@ -26,7 +26,23 @@ effect HighlightTile(x: Int, y: Int, color: String): Unit
 type Buffer = List[List[Cell]]
 extern def printString(s: String) at io: Unit =
   jsNode "process.stdout.write(${s})"
+def weaponModLabel(m: WeaponMod): String =
+  m match {
+    case NoneMod() => "none"
+    case ArmorBreak(amount) => "armor_break(" ++ amount.show ++ ")"
+    case ExtraCrit(k) => "crit+" ++ k.show
+    case AntiArmor(k) => "anti_armor(" ++ k.show ++ ")"
+    case MountedBonus(k) => "mounted(" ++ k.show ++ ")"
+  }
 
+def modsToString(ms: List[WeaponMod]): String =
+  ms match {
+    case Nil() => ""
+    case Cons(m, rest) =>
+      val head = weaponModLabel(m)
+      if (rest is Nil()) head
+      else head ++ ", " ++ modsToString(rest)
+  }
 def printUnitStats(u: gameUnbit): Unit = {
   printString("\n=== UNIT STATS ===\n")
   printString("Side: " ++ u.side ++ "\n")
@@ -50,17 +66,24 @@ def printWeapons(u: gameUnbit): Unit = {
           if (idx == u.activeWeapon) "-> " else "  "
 
         w.range match {
-  case (r1, r2) =>
-    printString(
-      marker ++
-      idx.show ++ ": " ++ w.name ++
-      " ATK=" ++ w.attack.show ++
-      " HIT=" ++ w.hit.show ++
-      " CRIT=" ++ w.crit.show ++
-      " RNG=" ++ r1.show ++ "-" ++ r2.show ++
-      " Uses=" ++ w.uses.show ++     "\n"
-    )
-}
+          case (r1, r2) =>
+            val modsStr =
+              if (w.mods is Nil()) ""
+              else " MODS=[" ++ modsToString(w.mods) ++ "]"
+
+            printString(
+              marker ++
+              idx.show ++ ": " ++ w.name ++
+              " ATK=" ++ w.attack.show ++
+              " HIT=" ++ w.hit.show ++
+              " CRIT=" ++ w.crit.show ++
+              " RNG=" ++ r1.show ++ "-" ++ r2.show ++
+              " Uses=" ++ w.uses.show ++
+              modsStr ++
+              "\n"
+            )
+        }
+
 
         loop(rest, idx + 1)
     }

@@ -6,9 +6,6 @@ effect modifyDamage(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon,
 effect modifyHit(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon, hit: Int): Int
 effect modifyCrit(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon, crit: Int): Int
 
-
-
-
 effect clamp0(n: Int): Int
 extern def randInt(max: Int) at io: Int =
   jsNode "Math.floor(Math.random() * ${max})"
@@ -199,8 +196,6 @@ def previewPure(map: GameMap, att: gameUnbit, defU: gameUnbit, wAtt: Weapon, wDe
     val c1 = c0 + sumExtraCrit(wa.mods)
     resume(c1)
   }
-
-
 
 def alive(u: gameUnbit): Bool = u.hp > 0
 

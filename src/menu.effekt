@@ -54,13 +54,6 @@ record CombatState(
   preview: CombatPreview
 )
 
-
-
-
-
-
-
-
 def unitAtPos(
   units: List[gameUnbit],
   x: Int,
@@ -241,7 +234,16 @@ def decWeaponUse(u: gameUnbit): gameUnbit =
         u.class
       )
   }
-
+def unitBySymbol(
+  units: List[gameUnbit],
+  sym: String
+): Option[gameUnbit] =
+  units match {
+    case Nil() => None()
+    case Cons(u, rest) =>
+      if (u.symbol == sym) Some(u)
+      else unitBySymbol(rest, sym)
+  }
 
   def unitSymbol(u: gameUnbit): String =
     u.symbol
@@ -642,11 +644,21 @@ def runMenu(
         val toks = dropEmpty(split(trimmed, " "))
 
         toks match {
-          case Cons("s", Cons(xs, Cons(ys, Nil()))) =>
-            (parseIntOpt(xs), parseIntOpt(ys)) match {
-              case (Some(x), Some(y)) => SelectUnit(x - 1, y - 1)
-              case _                  => ShowMovement()
-            }
+          case Cons("s", Cons(sym, Nil())) =>
+            val s = sym.trim()
+            if (s.length() == 0) ShowMovement()
+            else {
+              unitBySymbol(map.units, s) match {
+
+                case Some(u) =>
+                  
+                  SelectUnit(u.x, u.y)
+
+                case None() =>
+                  ShowMovement()
+              }
+  }
+
 
           case Cons(n, Nil()) =>
             parseIntOpt(n) match {

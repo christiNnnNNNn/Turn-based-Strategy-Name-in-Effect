@@ -350,7 +350,7 @@ else if (readingWeapons.get()) {
               curClass.get()
           )
 
-,
+          ,
             units.get()
           )
          )
