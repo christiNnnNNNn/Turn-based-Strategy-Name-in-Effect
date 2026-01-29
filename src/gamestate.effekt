@@ -3,6 +3,7 @@ import src/model
 import src/combat
 import src/movement
 import src/utils
+import src/weaponhandling
 
 type UIAction {
   Quit()
@@ -222,3 +223,157 @@ def sideHasUnits(units: List[gameUnbit], side: String): Bool =
       if (u.side == side && isAlive(u)) true
       else sideHasUnits(rest, side)
   }
+
+  def enemyPhase(map: GameMap): GameMap = {
+
+  def onlyPlayers(xs: List[gameUnbit]): List[gameUnbit] =
+    xs match {
+      case Nil() => Nil()
+      case Cons(u, rest) =>
+        if (isPlayer(u)) Cons(u, onlyPlayers(rest))
+        else onlyPlayers(rest)
+    }
+
+  def stepEnemy(cur: GameMap, e0: gameUnbit): GameMap =
+    cleanupMap(
+    if (not(isEnemy(e0)) || not(alive(e0))) cur
+    else {
+      nearestPlayer(e0, cur.units) match {
+        case None() => cur
+        case Some(tgt) =>
+
+          val reach = withGroundMovement(cur, e0)
+
+          val destOpt =
+            weaponhandling::activeWeapon(e0) match {
+              case None() =>
+                bestReachToward(reach, tgt.x, tgt.y)
+
+              case Some(wE0) =>
+                wE0.range match {
+                  case (rmin, rmax) =>
+                    bestReachForRange(reach, tgt.x, tgt.y, rmin, rmax)
+                }
+            }
+
+          val e1 =
+            destOpt match {
+              case None() => e0
+              case Some(TilePos(nx, ny)) =>
+                gameUnbit(
+                  e0.side, nx, ny,
+                  e0.hp, e0.strength, e0.magic, e0.defense, e0.resistance,
+                  e0.precision, e0.agility, e0.luck,
+                  e0.movement,
+                  e0.weapons, e0.activeWeapon,
+                  e0.moved,
+                  e0.symbol,
+                  e0.class
+                )
+            }
+
+          // commit movement
+          val unitsMoved = replaceUnit(cur.units, e0.x, e0.y, e1)
+          val mapMoved   = GameMap(cur.width, cur.height, cur.tiles, unitsMoved)
+
+          // attack (enemy -> player)
+          weaponhandling::activeWeapon(e1) match {
+            case None() => mapMoved
+            case Some(wE) =>
+              val ts  = collectTargets(e1, e1.x, e1.y, mapMoved.units, wE)
+              val ts2 = onlyPlayers(ts)
+
+              ts2 match {
+                case Nil() => mapMoved
+                case Cons(defU, _) =>
+
+                  // enemy strikes
+                  weaponhandling::activeWeapon(defU) match {
+                    case None() =>
+                      val pE  = previewPure(mapMoved, e1, defU, wE, wE)
+                      val r1  = resolveAttackPure(e1, defU, pE)
+                      val def1 = applyDamage(defU, r1.damage)
+
+                      printString(
+                        "\nENEMY ATTACK: " ++
+                        (if (r1.hit) "HIT" else "MISS") ++
+                        (if (r1.crit) " (CRIT)" else "") ++
+                        " dmg=" ++ r1.damage.show ++ "\n"
+                      )
+
+                      val unitsAfter = replaceUnit(mapMoved.units, defU.x, defU.y, def1)
+                      GameMap(mapMoved.width, mapMoved.height, mapMoved.tiles, unitsAfter)
+
+                    case Some(wP) =>
+                      val pE  = previewPure(mapMoved, e1, defU, wE, wP)
+                      val r1  = resolveAttackPure(e1, defU, pE)
+                      val def1 = applyDamage(defU, r1.damage)
+
+                      printString(
+                        "\nENEMY ATTACK: " ++
+                        (if (r1.hit) "HIT" else "MISS") ++
+                        (if (r1.crit) " (CRIT)" else "") ++
+                        " dmg=" ++ r1.damage.show ++ "\n"
+                      )
+
+                      val units1 = replaceUnit(mapMoved.units, defU.x, defU.y, def1)
+                      val map1   = GameMap(mapMoved.width, mapMoved.height, mapMoved.tiles, units1)
+
+                     
+                      if (alive(def1) && canCounter(def1, e1, wP)) {
+
+                        
+                        val defCounter0 = decWeaponUse(def1)
+
+                       
+                        weaponhandling::activeWeapon(defCounter0) match {
+                          case None() =>
+                            map1
+
+                          case Some(wPCur) =>
+                            val pC = previewPure(map1, defCounter0, e1, wPCur, wE)
+                            val r2 = resolveAttackPure(defCounter0, e1, pC)
+                            val e2 = applyDamage(e1, r2.damage)
+
+                            printString(
+                              "PLAYER COUNTER: " ++
+                              (if (r2.hit) "HIT" else "MISS") ++
+                              (if (r2.crit) " (CRIT)" else "") ++
+                              " dmg=" ++ r2.damage.show ++ "\n"
+                            )
+
+                            
+                            val unitsA =
+                              replaceUnit(map1.units, def1.x, def1.y, defCounter0)
+
+                            
+                            val unitsB =
+                              replaceUnit(unitsA, e1.x, e1.y, e2)
+
+                            GameMap(map1.width, map1.height, map1.tiles, unitsB)
+                        }
+
+                      } else {
+                        map1
+                      }
+                  }
+              }
+          }
+      }
+    }
+    )
+    def loopEnemies(xs: List[gameUnbit], cur: GameMap): GameMap =
+    xs match {
+      case Nil() => cur
+      case Cons(u, rest) =>
+        // refresh unit from current map (it may have moved earlier)
+        val uNow =
+          unitAt(cur.units, u.x, u.y) match {
+            case Some(u2) => u2
+            case None()   => u
+          }
+        loopEnemies(rest, stepEnemy(cur, uNow))
+    }
+
+  loopEnemies(map.units, map)
+}

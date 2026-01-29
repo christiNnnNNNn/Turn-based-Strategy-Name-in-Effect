@@ -6,7 +6,8 @@ import src/maploader
 import src/model
 import src/menu
 import io/console
-
+import src/utils
+import src/gamestate
 def main() = {
   val text = readFile("C:/Users/Christian/Documents/testMap.txt")
   val map  = parseMap(text)

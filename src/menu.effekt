@@ -6,7 +6,8 @@ import src/movement
 import src/renderer
 import src/combat
 import src/gamestate
-import src/menuUtils
+import src/utils
+import src/weaponhandling
 import string
 
 def afterPlayerCombat(m: GameMap): Unit =
@@ -14,6 +15,7 @@ def afterPlayerCombat(m: GameMap): Unit =
   endOrContinue(m) { mm =>
     runMenu(mm, None(), Nil(), None(), None())
   }
+
 def runMenu(
   map: GameMap,
   selected: Option[gameUnbit],
@@ -261,7 +263,7 @@ def runMenu(
           printString("You can only attack with player units.\n")
           runMenu(map, selected, reachable, moveState, combatState)
         } else {
-        activeWeapon(att) match {
+        weaponhandling::activeWeapon(att) match {
           case Some(wAtt) =>
             val (attX, attY) =
             moveState match {
@@ -290,7 +292,7 @@ def runMenu(
                   val defOpt = listGet(ts, idx0)   
                   defOpt match {
                     case Some(target) =>
-                      activeWeapon(target) match {
+                      weaponhandling::activeWeapon(target) match {
                         case Some(wDef) =>
 
                         
@@ -385,12 +387,12 @@ case ConfirmCombat() =>
           )
         val def0 = cs.defender
 
-        activeWeapon(att0) match {
+        weaponhandling::activeWeapon(att0) match {
           case None() =>
             runMenu(map, selected, reachable, None(), None())
 
           case Some(wAttNow) =>
-            activeWeapon(def0) match {
+            weaponhandling::activeWeapon(def0) match {
               case None() =>
                 runMenu(map, selected, reachable, None(), None())
 

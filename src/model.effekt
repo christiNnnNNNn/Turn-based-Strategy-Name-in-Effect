@@ -106,4 +106,3 @@ record Weapon(
   range:(Int,Int),
   mods: List[WeaponMod]
 )
-
