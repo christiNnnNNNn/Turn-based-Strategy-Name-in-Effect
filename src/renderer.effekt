@@ -4,7 +4,10 @@ import src/model
 import src/movement
 def dbg(s: String): Unit = printString("[DBG] " ++ s ++ "\n")
 def ansiGray(s: String): String = "\u001b[90m" ++ s ++ "\u001b[0m"
-
+def ansiBold(): String = "\u001b[1m"
+def ansiUnderline(): String = "\u001b[4m"
+def ansiNoStyle(): String = "\u001b[22m\u001b[24m"
+record Cell(char: String, fg: String, bg: String, style: String)
 type MoveState {
   Moving(
     unit: gameUnbit,
@@ -19,7 +22,7 @@ effect DrawTile(x: Int, y: Int, fill: String, outline: String): Unit
 effect DrawUnit(x: Int, y: Int, ch: String, color: String): Unit
 
 effect HighlightTile(x: Int, y: Int, color: String): Unit
-record Cell(char: String, fg: String, bg: String)
+
 type Buffer = List[List[Cell]]
 extern def printString(s: String) at io: Unit =
   jsNode "process.stdout.write(${s})"
@@ -66,26 +69,30 @@ def printWeapons(u: gameUnbit): Unit = {
 }
 def ansiFg(c: String): String =
   c match {
-    case "white"  => "\u001b[37m"
-    case "red"    => "\u001b[31m"
-    case "blue"   => "\u001b[34m"
-    case "yellow" => "\u001b[33m"
-    case "gray"   => "\u001b[90m" 
-    case _        => "\u001b[37m"
+    case "white"  => "\u001b[38;5;231m"
+    case "gray"   => "\u001b[38;5;250m"
+    case "black"  => "\u001b[38;5;250m"   
+    case "red"    => "\u001b[38;5;196m"   
+    case "blue"   => "\u001b[38;5;39m"    
+    case "yellow" => "\u001b[38;5;226m"
+    case _        => "\u001b[38;5;231m"
   }
+
+
 
 def ansiBg(c: String): String =
   c match {
-    case "white"  => "\u001b[47m"
-    case "yellow" => "\u001b[43m"
-    case "brown"  => "\u001b[48;5;94m"   
-    case "purple" => "\u001b[45m"
+    case "white"  => "\u001b[48;5;252m"
+    case "yellow" => "\u001b[48;5;229m"
+    case "brown"  => "\u001b[48;5;94m"  
+    case "purple" => "\u001b[48;5;60m"
 
-    case "green" => "\u001b[42m"
-    case "gray"  => "\u001b[100m"
+    case "green" => "\u001b[48;5;22m"
+    case "gray"  => "\u001b[48;5;240m"
     case "blue"  => "\u001b[44m"
     case "red"   => "\u001b[41m"
-    case _       => "\u001b[40m"
+    case "black" => "\u001b[40m"
+    case _       => "\u001b[48;5;16m"
   }
 
 
@@ -106,6 +113,7 @@ def printRow(row: List[Cell]): Unit =
     case Cons(c, rest) =>
       printString(
         ansiBg(c.bg) ++
+        c.style ++
         ansiFg(c.fg) ++
         c.char ++
         ansiReset()
@@ -115,8 +123,10 @@ def printRow(row: List[Cell]): Unit =
 
 
 
+
 def emptyCell(): Cell =
-  Cell(" ", "white", "black")
+  Cell(" ", "white", "black", "")
+
 
 
 
@@ -201,13 +211,13 @@ reachable.foreach { p =>
             if (s.x == u.x && s.y == u.y)
               "yellow"
            else if (u.side == "player")
-              (if (u.moved) "gray" else "blue")
+              (if (u.moved) "black" else "blue")
             else
               "red"
 
           case None() =>
              if (u.side == "player")
-              (if (u.moved) "gray" else "blue")
+              (if (u.moved) "black" else "blue")
             else
               "red"
         }
@@ -218,33 +228,37 @@ reachable.foreach { p =>
    
     moveState match {
       case Some(Moving(_, _, _, x, y, _)) =>
-        do HighlightTile(x, y, "yellow")
+        do HighlightTile(x, y, "black")
       case None() => ()
     }
 
   }
   with DrawTile { (x, y, fill, _) =>
     buffer.set(
-      setCell(buffer.get(), x, y, Cell(".", "white", fill))
+      setCell(buffer.get(), x, y, Cell(".", "white", fill, ""))
+
     )
     resume(())
   }
   with HighlightTile { (x, y, color) =>
     buffer.set(
-      setCell(buffer.get(), x, y, Cell(".", "white", color))
+      setCell(buffer.get(), x, y, Cell(".", "white", color,""))
     )
     resume(())
   }
   with DrawUnit { (x, y, ch, color) =>
-  val bg = getCell(buffer.get(), x, y).bg
-  val c =
-    if (ch.length() == 0) "?"
-    else ch.substring(0, 1)
+    val bg = getCell(buffer.get(), x, y).bg
+    val c =
+      if (ch.length() == 0) "?"
+      else ch.substring(0, 1)
 
-  buffer.set(
-    setCell(buffer.get(), x, y, Cell(c, color, bg))
-  )
-  resume(())
+    
+    val style = ansiBold()
+
+    buffer.set(
+      setCell(buffer.get(), x, y, Cell(c, color, bg, style))
+    )
+    resume(())
 }
 
 def renderMap(map: GameMap): Unit / { DrawTile } = {
