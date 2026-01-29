@@ -1,15 +1,224 @@
 
 import src/model
+import src/combat
+import src/movement
+import src/utils
+
+type UIAction {
+  Quit()
+  SelectUnit(x: Int, y: Int)
+  ShowMovement()
+  SwitchWeapon(index: Int)
+  MoveCursor(dx: Int, dy: Int)
+  CancelMove()
+  ConfirmMove() 
+  ListTargets()       
+  ConfirmCombat()     
+  CancelCombat() 
+  EndTurn()     
+  }
+
 record CombatState(
   attacker: gameUnbit,
-  defender: gameUnbit
-
+  attackerStartX: Int,
+  attackerStartY: Int,
+  attackerX: Int,
+  attackerY: Int,
+  defender: gameUnbit,
+  wAtt: Weapon,
+  wDef: Weapon,
+  preview: CombatPreview
 )
 
-record TargetEntry(
-  symbol: String,
-  index: Int,
-  unit: gameUnbit
-)
+type MoveState {
+  Moving(
+    unit: gameUnbit,
+    startX: Int,
+    startY: Int,
+    curX: Int,
+    curY: Int,
+    remaining: Int
+  )
+}
+
+def replaceUnit(
+  units: List[gameUnbit],
+  oldX: Int,
+  oldY: Int,
+  updated: gameUnbit
+): List[gameUnbit] =
+  units match {
+    case Nil() => Nil()
+
+    case Cons(u, rest) =>
+      if (u.x == oldX && u.y == oldY)
+        Cons(updated, rest)
+      else
+        Cons(u, replaceUnit(rest, oldX, oldY, updated))
+  }
+
+def resetMoved(units: List[gameUnbit]): List[gameUnbit] =
+  units match {
+    case Nil() => Nil()
+    case Cons(u, rest) =>
+      val u2 =
+        if (u.side == "player")
+          gameUnbit(
+            u.side, u.x, u.y,
+            u.hp, u.strength, u.magic, u.defense, u.resistance,
+            u.precision, u.agility, u.luck,
+            u.movement,
+            u.weapons,
+            u.activeWeapon,
+            false,
+            u.symbol,
+            u.class
+          )
+        else
+          u
+      Cons(u2, resetMoved(rest))
+  }
+
+def effectivePosition(
+  selected: Option[gameUnbit],
+  moveState: Option[MoveState]
+): Option[(gameUnbit, Int, Int)] =
+  moveState match {
+    case Some(Moving(u, _, _, cx, cy, _)) =>
+      Some((u, cx, cy))
+    case None() =>
+      selected match {
+        case Some(u) => Some((u, u.x, u.y))
+        case None()  => None()
+      }
+  }
+
+def nearestPlayer(enemy: gameUnbit, units: List[gameUnbit]): Option[gameUnbit] = {
+  def loop(
+    xs: List[gameUnbit],
+    best: Option[gameUnbit],
+    bestD: Int
+  ): Option[gameUnbit] =
+    xs match {
+      case Nil() => best
+      case Cons(u, rest) =>
+        if (u.side == "player") {
+          val d = manhattan(enemy.x, enemy.y, u.x, u.y)
+          best match {
+            case None() => loop(rest, Some(u), d)
+            case Some(_) =>
+              if (d < bestD)
+                loop(rest, Some(u), d)
+              else
+                loop(rest, best, bestD)
+          }
+        } else
+          loop(rest, best, bestD)
+    }
+
+  loop(units, None(), 999999)
+}
+
+def resolveAttackPure(att: gameUnbit, deff: gameUnbit, p: CombatPreview): AttackResult / {} =
+  try { resolveAttack(att, deff, p) }
+  with roll { max =>
+    val m: Int = if (max <= 0) 1 else max
+    resume(randInt(m))
+  }
+
+def bestReachForRange(
+  reach: List[TilePos],
+  tx: Int, ty: Int,
+  rmin: Int, rmax: Int
+): Option[TilePos] = {
+  def loop(
+    rs: List[TilePos],
+    best: Option[TilePos],
+    bestScore: Int,
+    bestDist: Int
+  ): Option[TilePos] =
+    rs match {
+      case Nil() => best
+      case Cons(p, rest) =>
+        val d = manhattan(p.x, p.y, tx, ty)
+
+        val score =
+          if (d < rmin) rmin - d
+          else if (d > rmax) d - rmax
+          else 0
+
+        best match {
+          case None() =>
+            loop(rest, Some(p), score, d)
+
+          case Some(_) =>
+            if (score < bestScore || (score == bestScore && d < bestDist))
+              loop(rest, Some(p), score, d)
+            else
+              loop(rest, best, bestScore, bestDist)
+        }
+    }
+
+  loop(reach, None(), 999999, 999999)
+}
+def endOrContinue(map: GameMap) { next: GameMap => Unit }: Unit =
+  val m = cleanupMap(map)
+  val pAlive = sideHasUnits(m.units, "player")
+  val eAlive = sideHasUnits(m.units, "enemy")
+
+  if (pAlive && eAlive) next(m)
+  else if (pAlive) { printString("\n*** YOU WIN! ***\n"); () }
+  else { printString("\n*** YOU LOSE! ***\n"); () }
 
 
+ def canCounter(
+  defU: gameUnbit,
+  attU: gameUnbit,
+  wDef: Weapon
+): Bool =
+  val (rmin, rmax) = wDef.range
+  val d = manhattan(defU.x, defU.y, attU.x, attU.y)
+  d >= rmin && d <= rmax
+
+
+
+  def bestReachToward(reach: List[TilePos], tx: Int, ty: Int): Option[TilePos] =
+  {def loop(rs: List[TilePos], best: Option[TilePos], bestD: Int): Option[TilePos] =
+    rs match {
+      case Nil() => best
+      case Cons(p, rest) =>
+        val d = manhattan(p.x, p.y, tx, ty)
+        best match {
+          case None() => loop(rest, Some(p), d)
+          case Some(_) =>
+            if (d < bestD) loop(rest, Some(p), d) else loop(rest, best, bestD)
+        }
+    }
+  loop(reach, None(), 999999)
+  }
+
+def isPlayer(u: gameUnbit): Bool = u.side == "player"
+
+def isEnemy(u: gameUnbit): Bool = u.side == "enemy"
+
+def isAlive(u: gameUnbit): Bool =
+  u.hp > 0
+
+def removeDead(units: List[gameUnbit]): List[gameUnbit] =
+  units match {
+    case Nil() => Nil()
+    case Cons(u, rest) =>
+      val tail = removeDead(rest)
+      if (isAlive(u)) Cons(u, tail) else tail
+  }
+
+def cleanupMap(m: GameMap): GameMap =
+  GameMap(m.width, m.height, m.tiles, removeDead(m.units))
+
+def sideHasUnits(units: List[gameUnbit], side: String): Bool =
+  units match {
+    case Nil() => false
+    case Cons(u, rest) =>
+      if (u.side == side && isAlive(u)) true
+      else sideHasUnits(rest, side)
+  }

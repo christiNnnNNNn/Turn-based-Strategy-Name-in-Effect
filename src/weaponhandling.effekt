@@ -1,0 +1,102 @@
+import src/model
+import src/utils
+def switchWeapon(
+  u: gameUnbit,
+  newIndex: Int
+): gameUnbit = {
+
+  def weaponCount(ws: List[Weapon]): Int =
+    ws match {
+      case Nil() => 0
+      case Cons(_, rest) => 1 + weaponCount(rest)
+    }
+
+  val count = weaponCount(u.weapons)
+
+  if (
+    u.side == "player" &&
+    newIndex >= 0 &&
+    newIndex < count
+  )
+    gameUnbit(
+      u.side,
+      u.x,
+      u.y,
+      u.hp,
+      u.strength,
+      u.magic,
+      u.defense,
+      u.resistance,
+      u.precision,
+      u.agility,
+      u.luck,
+      u.movement,
+      u.weapons,
+      newIndex,
+      u.moved,
+      u.symbol,
+      u.class       
+    )
+  else
+    u
+}
+
+def parseWeaponIndex(line: String): Option[Int] =
+  try {
+    Some(line.toInt1)
+  } with Exception[WrongFormat] {
+    def raise(_, _) = None()
+  }
+
+  def setWeaponAt(ws: List[Weapon], i: Int, nw: Weapon): List[Weapon] =
+  ws match {
+    case Nil() => Nil()
+    case Cons(w, rest) =>
+      if (i == 0) Cons(nw, rest)
+      else Cons(w, setWeaponAt(rest, i - 1, nw))
+  }
+
+  def activeWeapon(u: gameUnbit): Option[Weapon] =
+  getWeaponAt(u.weapons, u.activeWeapon)
+
+  def decWeaponUse(u: gameUnbit): gameUnbit =
+  activeWeapon(u) match {
+    case None() => u
+    case Some(w) =>
+      val newUses = max(0, w.uses - 1)
+      val w2 = Weapon(w.name, w.kind, w.damageType, w.attack, w.hit, newUses, w.crit,w.range, w.mods)
+      val ws2 = setWeaponAt(u.weapons, u.activeWeapon, w2)
+      gameUnbit(
+        u.side, u.x, u.y,
+        u.hp, u.strength, u.magic, u.defense, u.resistance,
+        u.precision, u.agility, u.luck,
+        u.movement,
+        ws2,
+        u.activeWeapon,
+        u.moved,
+        u.symbol,
+        u.class
+      )
+  }
+
+  def getWeaponAt(ws: List[Weapon], i: Int): Option[Weapon] =
+   ws match {
+    case Nil() => None()
+     case Cons(w, rest) =>
+       if (i == 0) Some(w) else getWeaponAt(rest, i - 1)
+   }
+
+   def absInt(n: Int): Int =
+  if (n < 0) 0 - n else n
+
+def getActiveWeapon(u: gameUnbit): Option[Weapon] = {
+  def loop(ws: List[Weapon], i: Int): Option[Weapon] =
+    ws match {
+      case Nil() => None()
+      case Cons(w, rest) =>
+        if (i == 0) Some(w)
+        else loop(rest, i - 1)
+    }
+
+  loop(u.weapons, u.activeWeapon)
+}

@@ -1,0 +1,204 @@
+import src/model
+import src/movement
+
+extern type JSConsole
+
+extern def readFile(path: String) at io: String =
+  jsNode """
+    require('fs').readFileSync(${path}, 'utf8')
+  """
+
+extern def readLine(console: JSConsole) at async: String =
+    jsNode "$effekt.capture(k => ${console}.once('line', k))"
+
+extern def newConsole() at io: JSConsole =
+    jsNode """readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      })"""
+
+extern def closeConsole(c: JSConsole) at io: Unit =
+  jsNode "${c}.close()"
+
+extern def printString(s: String) at io: Unit =
+  jsNode "process.stdout.write(${s})"
+
+def unitAtPos(
+  units: List[gameUnbit],
+  x: Int,
+  y: Int
+): Option[gameUnbit] =
+  units match {
+    case Nil() => None()
+    case Cons(u, rest) =>
+      if (u.x == x && u.y == y) Some(u)
+      else unitAtPos(rest, x, y)
+  }
+
+  def digitOpt(c: String): Option[Int] =
+  if (c == "0") Some(0)
+  else if (c == "1") Some(1)
+  else if (c == "2") Some(2)
+  else if (c == "3") Some(3)
+  else if (c == "4") Some(4)
+  else if (c == "5") Some(5)
+  else if (c == "6") Some(6)
+  else if (c == "7") Some(7)
+  else if (c == "8") Some(8)
+  else if (c == "9") Some(9)
+  else None()
+
+def parseNatOpt(s: String): Option[Int] =
+  val t = s.trim()
+  if (t.length() == 0) None()
+  else {
+    def loop(i: Int, acc: Int): Option[Int] =
+      if (i >= t.length()) Some(acc)
+      else
+        digitOpt(t.substring(i, i + 1)) match {
+          case None() => None()
+          case Some(d) => loop(i + 1, acc * 10 + d)
+        }
+
+    loop(0, 0)
+  }
+
+def parseIntOpt(s: String): Option[Int] =
+
+  parseNatOpt(s)
+
+  def toInt1(s: String): Int =
+  if (s.length() == 0) 0
+  else
+    val first = s.substring(0, 1)   
+    charToDigit(first)
+
+  def charToDigit(c: String): Int =
+    if (c == "0") 0
+    else if (c == "1") 1
+    else if (c == "2") 2
+    else if (c == "3") 3
+    else if (c == "4") 4
+    else if (c == "5") 5
+    else if (c == "6") 6
+    else if (c == "7") 7
+    else if (c == "8") 8
+    else if (c == "9") 9
+    else 0
+
+    def unitBySymbol(
+  units: List[gameUnbit],
+  sym: String
+): Option[gameUnbit] =
+  units match {
+    case Nil() => None()
+    case Cons(u, rest) =>
+      if (u.symbol == sym) Some(u)
+      else unitBySymbol(rest, sym)
+  }
+
+  def collectTargets(
+    att: gameUnbit,
+    attX: Int,
+    attY: Int,
+    units: List[gameUnbit],
+    wAtt: Weapon
+): List[gameUnbit] =
+  units match {
+    case Nil() => Nil()
+    case Cons(u, rest) =>
+      if (u.side != att.side && inRange(att, attX, attY, u, wAtt))
+        Cons(u, collectTargets(att, attX, attY, rest, wAtt))
+      else
+        collectTargets(att, attX, attY, rest, wAtt)
+  }
+
+  def rev[A](xs: List[A]): List[A] = reverse(xs)
+
+def extractAt(line: String, pos: Int, key: String): String =
+  line.substring(pos + key.length).trim()
+
+def extract(line: String, key: String): String = {
+  val idx = line.indexOf(key)
+
+  if (idx is Some(i)) {
+    extractAt(line, i, key)
+  } else {
+    ""
+  }
+}
+
+def between(line: String, start: String, end: String): String = {
+  val s = line.indexOf(start)
+  val e = line.indexOf(end)
+
+  (s, e) match {
+    case (Some(si), Some(ei)) =>
+      line.substring(si + start.length(), ei).trim()
+    case _ =>
+      ""
+  }
+}
+ def inRange(
+  att: gameUnbit,
+  attX: Int,
+  attY: Int,
+  deff: gameUnbit,
+  w: Weapon
+): Bool =
+  w.range match {
+    case (rmin, rmax) =>
+      val d = manhattan(attX, attY, deff.x, deff.y)
+      if (d < rmin) false
+      else if (d > rmax) false
+      else true
+  }
+
+def maxOption(list: List[Int]): Option[Int] =
+  list.foldLeft(None()) { (acc, x) =>
+    acc match {
+      case None() => Some(x)
+      case Some(m) => Some(if (x > m) x else m)
+    }
+  }
+
+def digit(c: String): Int =
+  if (c == "0") 0
+  else if (c == "1") 1
+  else if (c == "2") 2
+  else if (c == "3") 3
+  else if (c == "4") 4
+  else if (c == "5") 5
+  else if (c == "6") 6
+  else if (c == "7") 7
+  else if (c == "8") 8
+  else if (c == "9") 9
+  else 0
+
+def ptoInt(s: String): Int = {
+  val t = s.trim()
+
+  def loop(i: Int, acc: Int): Int =
+    if (i >= t.length()) acc
+    else {
+      val ch = t.substring(i, i + 1)
+      loop(i + 1, acc * 10 + digit(ch))
+    }
+
+  if (t.length() == 0) 0
+  else if (t.substring(0, 1) == "-")
+    0 - loop(1, 0)
+  else
+    loop(0, 0)
+}
+
+def unitSymbol(u: gameUnbit): String =
+    u.symbol
+
+def dropEmpty(xs: List[String]): List[String] =
+  xs match {
+    case Nil() => Nil()
+    case Cons(h, t) =>
+      if (h.trim() == "") dropEmpty(t)
+      else Cons(h, dropEmpty(t))
+  }

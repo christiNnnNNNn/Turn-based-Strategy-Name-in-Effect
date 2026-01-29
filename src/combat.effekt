@@ -10,10 +10,6 @@ effect clamp0(n: Int): Int
 extern def randInt(max: Int) at io: Int =
   jsNode "Math.floor(Math.random() * ${max})"
 
-
-def manhattan(x1: Int, y1: Int, x2: Int, y2: Int): Int =
-  abs(x1 - x2) + abs(y1 - y2)
-
 record CombatPreview(
   dmg: Int,
   hit: Int,

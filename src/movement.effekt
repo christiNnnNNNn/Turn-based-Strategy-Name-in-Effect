@@ -9,6 +9,7 @@ record Reach(
   y: Int,
   remaining: Int
 )
+
 def listGet[A](xs: List[A], i: Int): Option[A] =
   if (i < 0) None()
   else xs match {
@@ -30,6 +31,7 @@ def tileAt(map: GameMap, x: Int, y: Int): Tile =
         case Some(t) => t
       }
   }
+
 def classMoveMode(c: UnitClass): MoveMode =
   c match {
     case Soldier() => Foot()
@@ -37,6 +39,7 @@ def classMoveMode(c: UnitClass): MoveMode =
     case Knight()  => Cavalry()
     case Flyer()   => Flying()
   }
+
 def terrainCost(t: Tile): Int =
   t match {
     case TileFloor()  => 1
@@ -73,7 +76,6 @@ def isReachable(x: Int, y: Int, rs: List[TilePos]): Bool =
       else isReachable(x, y, rest)
   }
 
-
 def betterSeen(
   seen: List[(TilePos, Int)],
   x: Int,
@@ -88,6 +90,7 @@ def betterSeen(
       else
         betterSeen(rest, x, y, remaining)
   }
+
 def updateSeen(
   seen: List[(TilePos, Int)],
   x: Int,
@@ -163,10 +166,6 @@ def expand(
       }
     }
   }
-
-
-
-
 
 def withUnitMovementRules[R](
   map: GameMap,
@@ -269,8 +268,5 @@ def reachableTiles(
     Nil()
   )
 
-
-
-
-
-
+def manhattan(x1: Int, y1: Int, x2: Int, y2: Int): Int =
+  abs(x1 - x2) + abs(y1 - y2)

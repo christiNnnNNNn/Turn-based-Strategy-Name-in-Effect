@@ -2,30 +2,32 @@ module renderer
 
 import src/model
 import src/movement
+import src/gamestate
+import src/combat
+import src/utils
+
 def dbg(s: String): Unit = printString("[DBG] " ++ s ++ "\n")
 def ansiGray(s: String): String = "\u001b[90m" ++ s ++ "\u001b[0m"
 def ansiBold(): String = "\u001b[1m"
 def ansiUnderline(): String = "\u001b[4m"
 def ansiNoStyle(): String = "\u001b[22m\u001b[24m"
 record Cell(char: String, fg: String, bg: String, style: String)
-type MoveState {
-  Moving(
-    unit: gameUnbit,
-    startX: Int,
-    startY: Int,
-    curX: Int,
-    curY: Int,
-    remaining: Int
-  )
-}
 effect DrawTile(x: Int, y: Int, fill: String, outline: String): Unit
 effect DrawUnit(x: Int, y: Int, ch: String, color: String): Unit
-
 effect HighlightTile(x: Int, y: Int, color: String): Unit
 
 type Buffer = List[List[Cell]]
-extern def printString(s: String) at io: Unit =
-  jsNode "process.stdout.write(${s})"
+
+def printPreview(cs: CombatState): Unit =
+  printString(
+    "\n=== COMBAT PREVIEW ===\n" ++
+    "Target at (" ++ (cs.defender.x + 1).show ++ "," ++ (cs.defender.y + 1).show ++ ")\n" ++
+    "DAMAGE = " ++ cs.preview.dmg.show ++ "\n" ++
+    "HIT%   = " ++ cs.preview.hit.show ++ "\n" ++
+    "CRIT%  = " ++ cs.preview.crit.show ++ "\n" ++
+    "Confirm: f   Cancel: g\n"
+   )
+
 def weaponModLabel(m: WeaponMod): String =
   m match {
     case NoneMod() => "none"
@@ -312,5 +314,16 @@ def renderUnit(u: gameUnbit, color: String): Unit / { DrawUnit } =
     else u.symbol.substring(0, 1)
   do DrawUnit(u.x, u.y, ch, color)
 
+def printTargets(ts: List[gameUnbit], i: Int): Unit =
+  ts match {
+    case Nil() => ()
+    case Cons(u, rest) =>
+      printString(
+        unitSymbol(u) ++ " " ++ i.show ++
+        " at (" ++ (u.x + 1).show ++ "," ++ (u.y + 1).show ++ ")" ++
+        " HP=" ++ u.hp.show ++ "\n"
+      )
+      printTargets(rest, i + 1)
+  }
 
  

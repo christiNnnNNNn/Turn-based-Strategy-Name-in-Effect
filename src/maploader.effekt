@@ -3,96 +3,13 @@ module maploader
 import string
 import list
 import src/model
+import src/utils
 
-def rev[A](xs: List[A]): List[A] = reverse(xs)
-
-def extractAt(line: String, pos: Int, key: String): String =
-  line.substring(pos + key.length).trim()
-
-
-def extract(line: String, key: String): String = {
-  val idx = line.indexOf(key)
-
-  if (idx is Some(i)) {
-    extractAt(line, i, key)
-  } else {
-    ""
-  }
-}
-def between(line: String, start: String, end: String): String = {
-  val s = line.indexOf(start)
-  val e = line.indexOf(end)
-
-  (s, e) match {
-    case (Some(si), Some(ei)) =>
-      line.substring(si + start.length(), ei).trim()
-    case _ =>
-      ""
-  }
-}
-def maxOption(list: List[Int]): Option[Int] =
-  list.foldLeft(None()) { (acc, x) =>
-    acc match {
-      case None() => Some(x)
-      case Some(m) => Some(if (x > m) x else m)
-    }
-  }
-
-def toInt1(s: String): Int =
-  if (s.length() == 0) 0
-  else
-    val first = s.substring(0, 1)   
-    charToDigit(first)
-def digit(c: String): Int =
-  if (c == "0") 0
-  else if (c == "1") 1
-  else if (c == "2") 2
-  else if (c == "3") 3
-  else if (c == "4") 4
-  else if (c == "5") 5
-  else if (c == "6") 6
-  else if (c == "7") 7
-  else if (c == "8") 8
-  else if (c == "9") 9
-  else 0
-
-def ptoInt(s: String): Int = {
-  val t = s.trim()
-
-  def loop(i: Int, acc: Int): Int =
-    if (i >= t.length()) acc
-    else {
-      val ch = t.substring(i, i + 1)
-      loop(i + 1, acc * 10 + digit(ch))
-    }
-
-  if (t.length() == 0) 0
-  else if (t.substring(0, 1) == "-")
-    0 - loop(1, 0)
-  else
-    loop(0, 0)
-}
 def parseWeaponMod(s: String): WeaponMod =
   val t = s.trim()
   if (t == "none") NoneMod()
   else if (t == "armor_break") ArmorBreak(2) 
   else NoneMod()
-
-def charToDigit(c: String): Int =
-  if (c == "0") 0
-  else if (c == "1") 1
-  else if (c == "2") 2
-  else if (c == "3") 3
-  else if (c == "4") 4
-  else if (c == "5") 5
-  else if (c == "6") 6
-  else if (c == "7") 7
-  else if (c == "8") 8
-  else if (c == "9") 9
-  else 0
-
-
-
 
 def parseWeaponType(s: String): WeaponKind =
   if (s == "axe") Axe()
@@ -131,7 +48,6 @@ def parseUnitClass(s: String): UnitClass =
 
 def parseMap(text: String): GameMap = {
   var height = 0
-
   val rows   = ref[List[List[Tile]]](Nil())
   val units  = ref[List[gameUnbit]](Nil())
 
@@ -170,7 +86,6 @@ def parseMap(text: String): GameMap = {
 
   lines.foreach { line =>
     val trimmed = line.trim()
-
     val mapOpen    = trimmed.indexOf("<map>")
     val mapClose   = trimmed.indexOf("</map>")
     val unitsOpen  = trimmed.indexOf("<units>")
@@ -206,7 +121,6 @@ def parseMap(text: String): GameMap = {
           else {
             row = Cons(TileWall(), row)  //  fallback
           }
-
 
           i = i + 1
         }

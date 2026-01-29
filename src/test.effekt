@@ -1,10 +1,6 @@
 module src/test
 
 import test
-import src/lib
 
-def main() = mainSuite("lib") {
-  test("Hello world") {
-    assertEqual(helloWorld(), "Hello, world!")
-  }
-}
+
+

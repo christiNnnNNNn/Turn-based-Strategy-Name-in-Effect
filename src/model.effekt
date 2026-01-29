@@ -10,7 +10,6 @@ type Tile {
   TileMarsh()   // 'm' purple, cost 3, defensive debuff (higher hit)
 }
 
-
 type UnitClass {
   Soldier()
   Armor()
@@ -32,8 +31,9 @@ def showUnitClass(c: UnitClass): String =
     case Knight()  => "Knight"
     case Flyer()   => "Flyer"
   }
+
 record gameUnbit(
-  
+
   side: String,        // "player" or "enemy"
 
   x: Int,              // tile X position
@@ -62,9 +62,6 @@ record gameUnbit(
   symbol: String,  // the graphical idenfier off the unit on the map
   class: UnitClass
 )
-
-
-
 
 record GameMap(
   width: Int,
@@ -109,33 +106,4 @@ record Weapon(
   range:(Int,Int),
   mods: List[WeaponMod]
 )
-def getActiveWeapon(u: gameUnbit): Option[Weapon] = {
-  def loop(ws: List[Weapon], i: Int): Option[Weapon] =
-    ws match {
-      case Nil() => None()
-      case Cons(w, rest) =>
-        if (i == 0) Some(w)
-        else loop(rest, i - 1)
-    }
 
-  loop(u.weapons, u.activeWeapon)
-}
-def isAlive(u: gameUnbit): Bool =
-  u.hp > 0
-
-def removeDead(units: List[gameUnbit]): List[gameUnbit] =
-  units match {
-    case Nil() => Nil()
-    case Cons(u, rest) =>
-      val tail = removeDead(rest)
-      if (isAlive(u)) Cons(u, tail) else tail
-  }
-def cleanupMap(m: GameMap): GameMap =
-  GameMap(m.width, m.height, m.tiles, removeDead(m.units))
-def sideHasUnits(units: List[gameUnbit], side: String): Bool =
-  units match {
-    case Nil() => false
-    case Cons(u, rest) =>
-      if (u.side == side && isAlive(u)) true
-      else sideHasUnits(rest, side)
-  }
