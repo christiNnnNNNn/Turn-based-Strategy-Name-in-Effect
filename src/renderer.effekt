@@ -72,10 +72,10 @@ def printWeapons(u: gameUnbit): Unit = {
             val modsStr =
               if (w.mods is Nil()) ""
               else " MODS=[" ++ modsToString(w.mods) ++ "]"
-
+            val slectionnumber = idx + 1
             printString(
               marker ++
-              idx.show ++ ": " ++ w.name ++
+              slectionnumber.show ++ ": " ++ w.name ++
               " ATK=" ++ w.attack.show ++
               " HIT=" ++ w.hit.show ++
               " CRIT=" ++ w.crit.show ++

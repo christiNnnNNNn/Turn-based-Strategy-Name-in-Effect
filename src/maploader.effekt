@@ -4,6 +4,9 @@ import string
 import list
 import src/model
 import src/utils
+import src/movement
+effect ParseError(msg: String): Unit
+
 
 def parseWeaponMod(s: String): WeaponMod =
   val t = s.trim()
@@ -19,7 +22,7 @@ def parseWeaponType(s: String): WeaponKind =
   else Tome()
 
 def parseDamageType(s: String): DamageType =
-  if (s == "magical") Magic()
+  if (s == "magic") Magic()
   else Physical()
 
 def parseRange(s: String): (Int, Int) = {
@@ -46,7 +49,97 @@ def parseUnitClass(s: String): UnitClass =
       Soldier()
   }
 
-def parseMap(text: String): GameMap = {
+def isKnownTag(t: String): Bool =
+  t == "map" || t == "/map" ||
+  t == "units" || t == "/units" ||
+  t == "unit" || t == "/unit" ||
+  t == "weapons" || t == "/weapons" ||
+  t == "weapon" || t == "/weapon" ||
+  t == "modifier" || t == "/modifier" ||
+  t == "modifiers" || t == "/modifiers"
+
+def parseMap(text: String): GameMap / { ParseError } = {
+
+  def dbgTop(stack: List[String]): String =
+  stack match {
+    case Cons(t, _) => t
+    case Nil()      => "EMPTY"
+  }
+  def startsWith(s: String, prefix: String): Bool =
+  s.indexOf(prefix) match {
+    case Some(i) => i == 0
+    case None()  => false
+  }
+
+  val tagStack = ref[List[String]](Nil())
+  val failed   = ref(false)
+  val fallback = GameMap(0, 0, Nil(), Nil())
+
+  def openTag(tagStack: Ref[List[String]], name: String): Unit =
+    tagStack.set(Cons(name, tagStack.get()))
+
+  def closeTag(tagStack: Ref[List[String]], name: String): Unit =
+    tagStack.get() match {
+      case Cons(top, rest) =>
+        if (top != name) {
+          failed.set(true)
+          do ParseError("Closing tag </" ++ name ++ "> does not match <" ++ top ++ ">")
+          ()
+        } else {
+          tagStack.set(rest)
+        }
+
+      case Nil() =>
+        failed.set(true)
+        do ParseError("Unexpected closing tag </" ++ name ++ ">")
+        ()
+    }
+
+  def strInList(xs: List[String], s: String): Bool = xs match {
+    case Nil() => false
+    case Cons(h, t) => if (h == s) true else strInList(t, s)
+  }
+
+  def posEq(a: (Int, Int), b: (Int, Int)): Bool =
+  a match {
+    case (ax, ay) =>
+      b match {
+        case (bx, by) => (ax == bx) && (ay == by)
+      }
+  }
+
+  def posInList(xs: List[(Int,Int)], p: (Int,Int)): Bool = xs match {
+    case Nil() => false
+    case Cons(h, t) =>
+      if (posEq(h, p)) true else posInList(t, p)
+  }
+
+  def nthRow(rows: List[List[Tile]], y: Int): Option[List[Tile]] = {
+    if (y < 0) None()
+    else rows match {
+      case Nil() => None()
+      case Cons(r, rs) => if (y == 0) Some(r) else nthRow(rs, y - 1)
+    }
+  }
+
+  def nthTile(row: List[Tile], x: Int): Option[Tile] = {
+    if (x < 0) None()
+    else row match {
+      case Nil() => None()
+      case Cons(t, ts) => if (x == 0) Some(t) else nthTile(ts, x - 1)
+    }
+  }
+
+  def isWall(t: Tile): Bool = t match {
+    case TileWall() => true
+    case _          => false
+  }
+
+  def isFlyer(c: UnitClass): Bool = c match {
+    case Flyer() => true
+    case _       => false
+  }
+  
   var height = 0
   val rows   = ref[List[List[Tile]]](Nil())
   val units  = ref[List[gameUnbit]](Nil())
@@ -84,77 +177,274 @@ def parseMap(text: String): GameMap = {
   val wRange   = ref[(Int,Int)]((0,0))
   val lines = text.split("\n")
 
+  var builtTiles: List[List[Tile]] = Nil()
+  var mapW: Int = 0
+  var mapH: Int = 0
+
+  val usedSymbols = ref[List[String]](Nil())
+  val usedPos     = ref[List[(Int, Int)]](Nil())
   lines.foreach { line =>
-    val trimmed = line.trim()
-    val mapOpen    = trimmed.indexOf("<map>")
-    val mapClose   = trimmed.indexOf("</map>")
-    val unitsOpen  = trimmed.indexOf("<units>")
-    val unitsClose = trimmed.indexOf("</units>")
-
-    if (mapOpen.isDefined())        readingMap.set(true)
-    else if (mapClose.isDefined())  readingMap.set(false)
-    else if (unitsOpen.isDefined()) readingUnits.set(true)
-    else if (unitsClose.isDefined()) readingUnits.set(false)
-
-    else if (readingMap.get()) {
-      if (trimmed.length() > 0) {
-
-        val tileText =
-          trimmed.substring(0, trimmed.indexOf("/") match {
-            case Some(idx) => idx
-            case None()    => trimmed.length()
-          })
-
-        var row: List[Tile] = Nil()
-        var i = 0
-        val len = tileText.length()
-
-        while (i < len) {
-          val ch = tileText.substring(i, i + 1)
-
-          if (ch == "f")      row = Cons(TileFloor(), row)
-          else if (ch == "w") row = Cons(TileWall(), row)
-          else if (ch == "t") row = Cons(TileForest(), row)
-          else if (ch == "s") row = Cons(TileSand(), row)
-          else if (ch == "h") row = Cons(TileHills(), row)
-          else if (ch == "m") row = Cons(TileMarsh(), row)
-          else {
-            row = Cons(TileWall(), row)  //  fallback
-          }
-
-          i = i + 1
+    if (failed.get()) {
+      ()
+    } else {
+      val cleanedLine =
+        line.split("\r") match {
+          case Cons(h, _) => h
+          case Nil()      => ""
         }
 
-        rows.set(Cons(reverse(row), rows.get()))
-        height = height + 1
+      val trimmed = cleanedLine.trim()
+      val mapRootOpen  = trimmed == "<Map>"
+      val mapRootClose = trimmed == "</Map>"
+      val mapOpen    = trimmed == "<map>"
+      val mapClose   = trimmed == "</map>"
+      val unitsOpen  = trimmed == "<units>"
+      val unitsClose = trimmed == "</units>"
+      val isWeaponsOpen  = trimmed == "<weapons>"
+      val isWeaponsClose = trimmed == "</weapons>"
+      val isWeaponOpen   = trimmed == "<weapon>"
+      val isWeaponClose  = trimmed == "</weapon>"
+      if (mapRootOpen) openTag(tagStack, "Map")
+      else if (mapRootClose) closeTag(tagStack, "Map")
+      else if (mapOpen) {
+        if (readingUnits.get()) {
+          failed.set(true)
+          do ParseError("<map> opened inside <units>")
+          ()
+        }
+        readingMap.set(true)
+        openTag(tagStack, "map")
       }
-    }
+      else if (mapClose) {
+         if (not(readingMap.get())) {
+            failed.set(true)
+            do ParseError("</map> without <map>")
+            ()
+          }
+          readingMap.set(false)
+          closeTag(tagStack, "map")
+           
+          builtTiles = reverse(rows.get())
+          mapH = height
+          builtTiles match {
+            case Cons(firstRow, _) => mapW = firstRow.size()
+            case Nil()             => mapW = 0
+          }
+              }
+      else if (unitsOpen) {
+        if (readingMap.get()) {
+          failed.set(true)
+          do ParseError("<units> opened inside <map>")
+          ()
+        }
+        readingUnits.set(true)
+        openTag(tagStack, "units")
+      }
+      else if (unitsClose) {
+        if (not(readingUnits.get())) {
+          failed.set(true)
+          do ParseError("</units> without <units>")
+          ()
+        }
+        readingUnits.set(false)
+        closeTag(tagStack, "units")
+      }
+      else if (readingMap.get()) {
+        if (trimmed.indexOf("/") is Some(_)) {
+        if (trimmed.length() > 0) {
 
-    else if (readingUnits.get()) {
-      if (trimmed.indexOf("<weapons>") is Some(_))
-  readingWeapons.set(true)
+          val tileText =
+            trimmed.substring(0, trimmed.indexOf("/") match {
+              case Some(idx) => idx
+              case None()    => trimmed.length()
+            })
 
-else if (trimmed.indexOf("</weapons>") is Some(_))
-  readingWeapons.set(false)
+          var row: List[Tile] = Nil()
+          var i = 0
+          val len = tileText.length()
 
-else if (readingWeapons.get()) {
+          while (i < len) {
+            val ch = tileText.substring(i, i + 1)
 
-        if (trimmed.indexOf("<weapon>") is Some(_)) {
-          readingWeapon.set(true)
+            if (ch == "f")      row = Cons(TileFloor(), row)
+            else if (ch == "w") row = Cons(TileWall(), row)
+            else if (ch == "t") row = Cons(TileForest(), row)
+            else if (ch == "s") row = Cons(TileSand(), row)
+            else if (ch == "h") row = Cons(TileHills(), row)
+            else if (ch == "m") row = Cons(TileMarsh(), row)
+            else {
+              row = Cons(TileFloor(), row)  //  fallback
+            }
 
-          wName.set("")
-          wType.set(Axe())
-          wDmg.set(Physical())
-          wAtk.set(0)
-          wHit.set(0)
-          wUses.set(0)
-          wCrit.set(0)
-          wRange.set((0,0))
+            i = i + 1
+          }
+
+          rows.set(Cons(reverse(row), rows.get()))
+          height = height + 1
+        }
+         } else if (trimmed.length() > 0) {
+          failed.set(true)
+          do ParseError("Non-map row inside <map>: " ++ trimmed)
+          ()
+        }
+      }
+
+      else if (readingUnits.get()) {
+        
+        if (trimmed == "<unit>") {
+          printString("[DBG] SAW UNIT OPEN LINE: " ++ trimmed ++ "\n")
+          printString("[DBG] <unit> open, top before = " ++ dbgTop(tagStack.get()) ++ "\n")
+          openTag(tagStack, "unit")
+          printString("[DBG] <unit> open, top after  = " ++ dbgTop(tagStack.get()) ++ "\n")
+
+          curSide.set("player")
+          curX.set(0); curY.set(0)
+          curHP.set(1); curStrength.set(1); curMagic.set(1)
+          curDefense.set(1); curResistance.set(1)
+          curPrecision.set(1); curAgility.set(1); curLuck.set(1)
+          curMovement.set(1)
+          curSymbol.set("")
+          curClass.set(Soldier())
+
+          weapons.set(Nil())
+          readingWeapons.set(false)
+          readingWeapon.set(false)
           readingMods.set(false)
           curMods.set(Nil())
         }
+       else if (trimmed == "</unit>") {
+          printString("[DBG] </unit> close, top before = " ++ dbgTop(tagStack.get()) ++ "\n")
+          closeTag(tagStack, "unit")
+          printString("[DBG] </unit> close, top after  = " ++ dbgTop(tagStack.get()) ++ "\n")
 
-        else if (trimmed.indexOf("</weapon>") is Some(_)) {
+          val fx = curX.get() - 1
+          val fy = curY.get() - 1
+
+          val mw = mapW
+          val mh = mapH
+
+          if (fx < 0 || fy < 0 || fx >= mw || fy >= mh) {
+            failed.set(true)
+            do ParseError(
+              "Unit '" ++ curSymbol.get() ++ "' placed outside map at (" ++
+              show(fx + 1) ++ "," ++ show(fy + 1) ++ "), map is " ++
+              show(mw) ++ "x" ++ show(mh)
+            )
+            ()
+          }
+          else if (posInList(usedPos.get(), (fx, fy))) {
+
+            failed.set(true)
+            do ParseError(
+              "Unit '" ++ curSymbol.get() ++ "' placed on occupied tile (" ++
+              show(fx + 1) ++ "," ++ show(fy + 1) ++ ")"
+            )
+            ()
+          }
+          else if (strInList(usedSymbols.get(), curSymbol.get())) {
+
+            failed.set(true)
+            do ParseError(
+              "Duplicate unit symbol '" ++ curSymbol.get() ++ "'"
+            )
+            ()
+          }
+          else {
+ 
+            val tempMap = GameMap(mapW, mapH, builtTiles, Nil())
+            val t = tileAt(tempMap, fx, fy)
+            if (isWall(t) && not(isFlyer(curClass.get()))) {
+                  failed.set(true)
+                  do ParseError(
+                    "non Fyling Unit '" ++ curSymbol.get() ++ "' placed on a wall at (" ++
+                    show(fx + 1) ++ "," ++ show(fy + 1) ++ ")"
+                  )
+                  ()
+                }
+              }
+
+            if (not(failed.get())) {
+              usedPos.set(Cons((fx, fy), usedPos.get()))
+              usedSymbols.set(Cons(curSymbol.get(), usedSymbols.get()))
+
+              units.set(
+                Cons(
+                  gameUnbit(
+                    curSide.get(),
+                    fx, fy,
+                    curHP.get(),
+                    curStrength.get(),
+                    curMagic.get(),
+                    curDefense.get(),
+                    curResistance.get(),
+                    curPrecision.get(),
+                    curAgility.get(),
+                    curLuck.get(),
+                    curMovement.get(),
+                    reverse(weapons.get()),
+                    0,
+                    false,
+                    curSymbol.get(),
+                    curClass.get()
+                  ),
+                  units.get()
+                )
+              )
+            
+          }
+
+          readingWeapons.set(false)
+          readingWeapon.set(false)
+          readingMods.set(false)
+        }
+
+        else if (trimmed == "<weapons>"){
+          readingWeapons.set(true)
+          openTag(tagStack, "weapons")
+        }
+
+        else if (trimmed == "</weapons>") {
+          if (not(readingWeapons.get())) {
+            failed.set(true)
+            do ParseError("</weapons> without <weapons>")
+            ()
+          }
+          readingWeapons.set(false)
+          closeTag(tagStack, "weapons")
+        }
+
+        else if (trimmed == "<weapon>") {
+          if (not(readingWeapons.get())) {
+            failed.set(true)
+            do ParseError("<weapon> outside <weapons>")
+            ()
+          } else {
+            readingWeapon.set(true)
+            openTag(tagStack, "weapon")
+
+            wName.set("No_Name_Set")
+            wType.set(Axe())
+            wDmg.set(Physical())
+            wAtk.set(1)
+            wHit.set(1)
+            wUses.set(1)
+            wCrit.set(1)
+            wRange.set((1,1))
+            readingMods.set(false)
+            curMods.set(Nil())
+          }
+        }
+
+
+        else if (trimmed == "</weapon>") {
+          if (not(readingWeapon.get())) {
+            failed.set(true)
+            do ParseError("</weapon> without <weapon>")
+            ()
+          } else {
+            readingWeapon.set(false)
+            closeTag(tagStack, "weapon")
+
           weapons.set(
             Cons(
               Weapon(
@@ -167,12 +457,11 @@ else if (readingWeapons.get()) {
                 wCrit.get(),
                 wRange.get(),
                 reverse(curMods.get())
-
               ),
               weapons.get()
             )
           )
-          readingWeapon.set(false)
+          }
         }
 
         else if (readingWeapon.get()) {
@@ -197,139 +486,86 @@ else if (readingWeapons.get()) {
           val crit = between(trimmed, "<crit>", "</crit>")
           if (crit.length() > 0) wCrit.set(ptoInt(crit))
 
-           val range = between(trimmed, "<range>", "</range>")
+          val range = between(trimmed, "<range>", "</range>")
           if (range.length() > 0) wRange.set(parseRange(range))
 
-          else if (trimmed.indexOf("<modifiers>") is Some(_)) {
-          readingMods.set(true)
-          }
-          else if (trimmed.indexOf("</modifiers>") is Some(_)) {
+          if (trimmed == "<modifiers>") {
+            readingMods.set(true)
+          } else if (trimmed == "</modifiers>") {
             readingMods.set(false)
-          }
-          else if (readingWeapon.get() && readingMods.get()) {
+          } else if (readingMods.get()) {
             val m = between(trimmed, "<modifier>", "</modifier>")
-            if (m.length() > 0) {
-              curMods.set(Cons(parseWeaponMod(m), curMods.get()))
-            }
+            if (m.length() > 0) curMods.set(Cons(parseWeaponMod(m), curMods.get()))
           }
         }
-      }
-      if (trimmed.indexOf("<unit>") is Some(_)) {
-        curSide.set("")
-        curX.set(0)
-        curY.set(0)
-        curHP.set(0)
-        curStrength.set(0)
-        curMagic.set(0)
-        curDefense.set(0)
-        curResistance.set(0)
-        curPrecision.set(0)
-        curAgility.set(0)
-        curLuck.set(0)
-        curMovement.set(0)
-        curSymbol.set("")
-        curClass.set(Soldier())
-        weapons.set(Nil())
-      }
 
-      else if (trimmed.indexOf("</unit>") is Some(_)) {
-        val fx = curX.get() - 1
-        val fy = curY.get() - 1
-        readingWeapons.set(false)
-        readingWeapon.set(false)
+        // ----- unit fields -----
+        else {
+          val side = between(trimmed, "<side>", "</side>")
+          if (side.length() > 0) curSide.set(side)
 
-        val internalY = fy
+          val sym = between(trimmed, "<symbol>", "</symbol>")
+          if (sym.length() > 0) curSymbol.set(sym)
 
-         units.set(
-          Cons(
-             gameUnbit(
-                  
-              curSide.get(),
-              fx,
-              fy,
+          val xs = between(trimmed, "<x>", "</x>")
+          if (xs.length() > 0) curX.set(ptoInt(xs))
 
-              curHP.get(),
-              curStrength.get(),
-              curMagic.get(),
-              curDefense.get(),
-              curResistance.get(),
-              curPrecision.get(),
-              curAgility.get(),
-              curLuck.get(),
-              curMovement.get(),
-              reverse(weapons.get()),
-              0,
-              false,
-              curSymbol.get(),
-              curClass.get()
-          )
+          val ys = between(trimmed, "<y>", "</y>")
+          if (ys.length() > 0) curY.set(ptoInt(ys))
 
-          ,
-            units.get()
-          )
-         )
-      }
+          val hp = between(trimmed, "<hp>", "</hp>")
+          if (hp.length() > 0) curHP.set(ptoInt(hp))
 
+          val str = between(trimmed, "<strength>", "</strength>")
+          if (str.length() > 0) curStrength.set(ptoInt(str))
 
-      else {
-        
-        val side = between(trimmed, "<side>", "</side>")
-        if (side.length() > 0) curSide.set(side)
+          val mag = between(trimmed, "<magic>", "</magic>")
+          if (mag.length() > 0) curMagic.set(ptoInt(mag))
 
-        val sym = between(trimmed, "<symbol>", "</symbol>")
-        if (sym.length() > 0) curSymbol.set(sym)
+          val deff = between(trimmed, "<defense>", "</defense>")
+          if (deff.length() > 0) curDefense.set(ptoInt(deff))
 
-        val xs = between(trimmed, "<x>", "</x>")
-        if (xs.length() > 0) curX.set(ptoInt(xs))
+          val res = between(trimmed, "<resistance>", "</resistance>")
+          if (res.length() > 0) curResistance.set(ptoInt(res))
 
-        val ys = between(trimmed, "<y>", "</y>")
-        if (ys.length() > 0) curY.set(ptoInt(ys))
+          val pre = between(trimmed, "<precision>", "</precision>")
+          if (pre.length() > 0) curPrecision.set(ptoInt(pre))
 
-        val hp = between(trimmed, "<hp>", "</hp>")
-        if (hp.length() > 0) curHP.set(ptoInt(hp))
+          val agi = between(trimmed, "<agility>", "</agility>")
+          if (agi.length() > 0) curAgility.set(ptoInt(agi))
 
-        val str = between(trimmed, "<strength>", "</strength>")
-        if (str.length() > 0) curStrength.set(ptoInt(str))
+          val luck = between(trimmed, "<luck>", "</luck>")
+          if (luck.length() > 0) curLuck.set(ptoInt(luck))
 
-        val mag = between(trimmed, "<magic>", "</magic>")
-        if (mag.length() > 0) curMagic.set(ptoInt(mag))
+          val mov = between(trimmed, "<movement>", "</movement>")
+          if (mov.length() > 0) curMovement.set(ptoInt(mov))
 
-        val deff = between(trimmed, "<defense>", "</defense>")
-        if (deff.length() > 0) curDefense.set(ptoInt(deff))
-
-        val res = between(trimmed, "<resistance>", "</resistance>")
-        if (res.length() > 0) curResistance.set(ptoInt(res))
-
-        val pre = between(trimmed, "<precision>", "</precision>")
-        if (pre.length() > 0) curPrecision.set(ptoInt(pre))
-
-        val agi = between(trimmed, "<agility>", "</agility>")
-        if (agi.length() > 0) curAgility.set(ptoInt(agi))
-
-        val luck = between(trimmed, "<luck>", "</luck>")
-        if (luck.length() > 0) curLuck.set(ptoInt(luck))
-
-        val mov = between(trimmed, "<movement>", "</movement>")
-        if (mov.length() > 0) curMovement.set(ptoInt(mov))
-
-        val cls = between(trimmed, "<class>", "</class>")
-        if (cls.length() > 0) curClass.set(parseUnitClass( cls))
+          val cls = between(trimmed, "<class>", "</class>")
+          if (cls.length() > 0) curClass.set(parseUnitClass(cls))
+        }
       }
     }
   }
-
-  var mapRows : List[List[Tile]] = Nil()
-  rows.get().foreach { r =>
-    mapRows = Cons(r, mapRows)
-  }
-
+         var mapRows : List[List[Tile]] = Nil()
+       rows.get().foreach { r =>
+  mapRows = Cons(r, mapRows)
+}
+ 
   var w = 0
   mapRows match {
     case Cons(firstRow, _) => w = firstRow.size()
     case Nil()             => w = 0
   }
+ if (not(failed.get())) {
+  tagStack.get() match {
+    case Nil() => ()
+    case Cons(t, _) =>
+      failed.set(true)
+      do ParseError("Unclosed tag <" ++ t ++ "> at end of file")
+  }
+  }
+  if (failed.get()) fallback
+  else GameMap(w, height, mapRows, units.get())
+  
 
-  GameMap(w, height, mapRows, units.get())
 }
-
-

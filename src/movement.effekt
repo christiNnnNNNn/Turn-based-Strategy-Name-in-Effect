@@ -19,7 +19,6 @@ def listGet[A](xs: List[A], i: Int): Option[A] =
       else listGet(rest, i - 1)
   }
 
-
 def tileAt(map: GameMap, x: Int, y: Int): Tile =
   listGet(map.tiles, y) match {
     case None() =>
