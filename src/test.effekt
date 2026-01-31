@@ -1,0 +1,27 @@
+module src/test
+
+import test
+import src/tests/combattests
+import src/tests/gamestatetests
+import src/tests/maplaodertests
+import src/tests/menutests
+import src/tests/modeltests
+import src/tests/movementtests
+import src/tests/renderertests
+import src/tests/utilstests
+import src/tests/weaponhandlingtests
+import src/tests/menuendtoendtests
+def main() = mainSuite("lib") {
+  combatTests()
+  gamestateTests()
+  maploaderTests()
+  maploaderTests()
+  menuTests()
+  modelTests()
+  movementTests()
+  rendererTests()
+  utilsTests()
+  weaponhandlingTests()
+  val _ = menuEndToEndTests()
+  ()
+}

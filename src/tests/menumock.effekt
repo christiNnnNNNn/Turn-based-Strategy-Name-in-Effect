@@ -1,0 +1,40 @@
+module menumock
+
+import test
+import src/model
+import src/tests/menutest
+import string
+
+record RunResult(out: String)
+
+def runMenuScript(
+  startMap: GameMap,
+  inputs: List[String]
+): RunResult / { test::Assertion } = {
+
+  val inRef  = ref(inputs)
+  val outRef = ref("")
+
+  def popLine(): String =
+    inRef.get() match {
+      case Nil() =>
+        "q"              // stop menu if script runs out
+      case Cons(h, t) =>
+        inRef.set(t)
+        h
+    }
+
+  try {
+    runMenuTest(startMap, None(), Nil(), None(), None())
+  }
+  with UIReadLine { () =>
+    resume(popLine())
+  }
+  with UIWrite { s =>
+    outRef.set(outRef.get() ++ s)
+    resume(())
+  }
+
+  RunResult(outRef.get())
+}
+

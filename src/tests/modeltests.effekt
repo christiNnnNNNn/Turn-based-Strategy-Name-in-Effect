@@ -1,0 +1,104 @@
+import test
+import src/tests/testutils
+import src/model
+def modelTests() = {
+  test("showUnitClass prints correct names") {
+    assertEqual(showUnitClass(Soldier()), "Soldier")
+    assertEqual(showUnitClass(Armor()), "Armor")
+    assertEqual(showUnitClass(Knight()), "Knight")
+    assertEqual(showUnitClass(Flyer()), "Flyer")
+  }
+
+  test("setPos updates x/y and preserves other fields") {
+    val u = mkUnit0()
+    val u2 = setPos(u, 9, 8)
+
+    assertEqual(u2.x, 9)
+    assertEqual(u2.y, 8)
+
+    assertEqual(u2.side, u.side)
+    assertEqual(u2.hp, u.hp)
+    assertEqual(u2.strength, u.strength)
+    assertEqual(u2.magic, u.magic)
+    assertEqual(u2.defense, u.defense)
+    assertEqual(u2.resistance, u.resistance)
+    assertEqual(u2.precision, u.precision)
+    assertEqual(u2.agility, u.agility)
+    assertEqual(u2.luck, u.luck)
+    assertEqual(u2.movement, u.movement)
+    assertEqual(u2.moved, u.moved)
+    assertEqual(u2.symbol, u.symbol)
+    assertEqual(u2.class, u.class)
+    assertEqual(u2.activeWeapon, u.activeWeapon)
+  }
+
+  test("setHp updates hp only") {
+    val u = mkUnit0()
+    val u2 = setHp(u, 123)
+
+    assertEqual(u2.hp, 123)
+    assertEqual(u2.x, u.x)
+    assertEqual(u2.y, u.y)
+    assertEqual(u2.side, u.side)
+    assertEqual(u2.moved, u.moved)
+    assertEqual(u2.symbol, u.symbol)
+    assertEqual(u2.class, u.class)
+  }
+
+  test("setMoved updates moved only") {
+    val u = mkUnit0()
+    val u2 = setMoved(u, true)
+
+    assertEqual(u2.moved, true)
+    assertEqual(u2.x, u.x)
+    assertEqual(u2.y, u.y)
+    assertEqual(u2.hp, u.hp)
+    assertEqual(u2.side, u.side)
+    assertEqual(u2.symbol, u.symbol)
+    assertEqual(u2.class, u.class)
+  }
+
+  test("setWeapons replaces weapons list and active index") {
+    val u = mkUnit0()
+
+    val w1 = Weapon("W1", Sword(), Physical(), 1, 1, 10, 0, (1,1), Nil())
+    val w2 = Weapon("W2", Bow(),   Physical(), 2, 2, 20, 0, (2,2), Nil())
+    val ws = Cons(w1, Cons(w2, Nil()))
+
+    val u2 = setWeapons(u, ws, 1)
+
+    assertEqual(u2.activeWeapon, 1)
+
+    // spot-check weapons list kept
+    u2.weapons match {
+      case Cons(a, Cons(b, Nil())) =>
+        assertEqual(a.name, "W1")
+        assertEqual(b.name, "W2")
+      case _ =>
+        assertEqual(true, false)
+    }
+
+    // unchanged identity fields
+    assertEqual(u2.side, u.side)
+    assertEqual(u2.x, u.x)
+    assertEqual(u2.y, u.y)
+    assertEqual(u2.hp, u.hp)
+    assertEqual(u2.symbol, u.symbol)
+    assertEqual(u2.class, u.class)
+  }
+
+  test("setPosMoved equals setMoved(setPos(u,x,y),moved)") {
+    val u = mkUnit0()
+
+    val a = setPosMoved(u, 4, 5, true)
+    val b = setMoved(setPos(u, 4, 5), true)
+
+    assertEqual(a.side, b.side)
+    assertEqual(a.x, b.x)
+    assertEqual(a.y, b.y)
+    assertEqual(a.hp, b.hp)
+    assertEqual(a.moved, b.moved)
+    assertEqual(a.symbol, b.symbol)
+    assertEqual(a.class, b.class)
+  }
+}

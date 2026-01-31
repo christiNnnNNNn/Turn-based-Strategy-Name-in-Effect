@@ -1,0 +1,282 @@
+import test
+import src/tests/testutils
+import src/model
+import src/gamestate
+import src/movement
+
+def gamestateTests() = {
+  test("replaceUnit replaces by oldX/oldY and keeps list length") {
+      val u1 = mkUQuick("player", 0, 0, 10, false, Soldier(), "A")
+      val u2 = mkUQuick("enemy",  1, 1, 10, false, Soldier(), "B")
+      val u3 = mkUQuick("player", 2, 2, 10, false, Soldier(), "C")
+
+      val updated = mkUQuick("enemy", 1, 1, 7, false, Soldier(), "B")
+
+      val xs = Cons(u1, Cons(u2, Cons(u3, Nil())))
+      val ys = replaceUnit(xs, 1, 1, updated)
+
+      // Check: replaced unit has hp=7 at (1,1)
+      val found =
+        ys match {
+          case Cons(a, Cons(b, Cons(c, Nil()))) => (a, b, c)
+          case _ => (u1, u2, u3) // should not happen
+        }
+
+      // One of them should be updated; easiest: check side+pos+hp exists by manual scan:
+      def hasUpdated(us: List[gameUnbit]): Bool =
+        us match {
+          case Nil() => false
+          case Cons(u, rest) =>
+            if (u.x == 1 && u.y == 1 && u.hp == 7) true else hasUpdated(rest)
+        }
+
+      assertEqual(hasUpdated(ys), true)
+    }
+
+    test("resetMoved sets moved=false for player units only") {
+      val p1 = mkUQuick("player", 0, 0, 10, true,  Soldier(), "A")
+      val p2 = mkUQuick("player", 1, 0, 10, false, Soldier(), "B")
+      val e1 = mkUQuick("enemy",  2, 0, 10, true,  Soldier(), "E")
+
+      val xs = Cons(p1, Cons(p2, Cons(e1, Nil())))
+      val ys = resetMoved(xs)
+
+      def find(sym: String, us: List[gameUnbit]): Option[gameUnbit] =
+        us match {
+          case Nil() => None()
+          case Cons(u, rest) => if (u.symbol == sym) Some(u) else find(sym, rest)
+        }
+
+      val p1y = find("A", ys) match { case Some(u) => u case None() => p1 }
+      val p2y = find("B", ys) match { case Some(u) => u case None() => p2 }
+      val e1y = find("E", ys) match { case Some(u) => u case None() => e1 }
+
+      assertEqual(p1y.moved, false)
+      assertEqual(p2y.moved, false)
+      assertEqual(e1y.moved, true)   // enemy unchanged
+    }
+
+    test("effectivePosition prefers moveState cursor position") {
+      val u = mkUQuick("player", 0, 0, 10, false, Soldier(), "A")
+      val sel = Some(u)
+      val ms = Some(Moving(u, 0, 0, 2, 1, 3))
+
+      val out = effectivePosition(sel, ms)
+      out match {
+        case Some((uu, x, y)) =>
+          assertEqual(uu.symbol, "A")
+          assertEqual(x, 2)
+          assertEqual(y, 1)
+        case None() =>
+          assertEqual(true, false) // fail
+      }
+    }
+
+    test("effectivePosition returns selected unit position when not moving") {
+      val u = mkUQuick("player", 2, 2, 10, false, Soldier(), "A")
+      val out = effectivePosition(Some(u), None())
+      out match {
+        case Some((uu, x, y)) =>
+          assertEqual(uu.symbol, "A")
+          assertEqual(x, 2)
+          assertEqual(y, 2)
+        case None() =>
+          assertEqual(true, false)
+      }
+    }
+
+    test("nearestPlayer returns closest player by manhattan distance") {
+      val enemy = mkUQuick("enemy",  0, 0, 10, false, Soldier(), "E")
+      val pFar  = mkUQuick("player", 2, 2, 10, false, Soldier(), "A") // dist 4
+      val pNear = mkUQuick("player", 1, 0, 10, false, Soldier(), "B") // dist 1
+      val e2    = mkUQuick("enemy",  2, 0, 10, false, Soldier(), "X")
+
+      val units = Cons(pFar, Cons(e2, Cons(pNear, Nil())))
+      val res = nearestPlayer(enemy, units)
+
+      res match {
+        case Some(u) => assertEqual(u.symbol, "B")
+        case None()  => assertEqual(true, false)
+      }
+    }
+
+    test("bestReachForRange chooses tile with distance inside [rmin,rmax] when available") {
+      val reach =
+        Cons(tp(0,0),
+        Cons(tp(1,0),
+        Cons(tp(2,0),
+            Nil())))
+
+      // Target at (2,2):
+      // dist(0,0)=4 (outside if rmax=3 => score 1)
+      // dist(1,0)=3 (inside => score 0)
+      // dist(2,0)=2 (inside => score 0, but smaller dist => should win tie)
+      val best = bestReachForRange(reach, 2, 2, 2, 3)
+
+      best match {
+        case Some(TilePos(x,y)) =>
+          assertEqual(x, 2)
+          assertEqual(y, 0)
+        case None() =>
+          assertEqual(true, false)
+      }
+    }
+
+    test("bestReachForRange chooses closest-to-range tile when none in range") {
+      val reach =
+        Cons(tp(0,0),
+        Cons(tp(0,1),
+            Nil()))
+
+      // Target (2,2), want range [1,1]
+      // dist(0,0)=4 score=3
+      // dist(0,1)=3 score=2 => better
+      val best = bestReachForRange(reach, 2, 2, 1, 1)
+
+      best match {
+        case Some(TilePos(x,y)) =>
+          assertEqual(x, 0)
+          assertEqual(y, 1)
+        case None() =>
+          assertEqual(true, false)
+      }
+    }
+
+    test("canCounter true when distance within defender weapon range") {
+      val defU = mkUQuick("player", 0, 0, 10, false, Soldier(), "D")
+      val attU = mkUQuick("enemy",  0, 1, 10, false, Soldier(), "A")
+
+      val wDef = Weapon("Sword", Sword(), Physical(), 0, 0, 10, 0, (1,1), Nil())
+      assertEqual(canCounter(defU, attU, wDef), true)
+    }
+
+    test("canCounter false when out of range") {
+      val defU = mkUQuick("player", 0, 0, 10, false, Soldier(), "D")
+      val attU = mkUQuick("enemy",  0, 3, 10, false, Soldier(), "A")
+
+      val wDef = Weapon("Sword", Sword(), Physical(), 0, 0, 10, 0, (1,1), Nil())
+      assertEqual(canCounter(defU, attU, wDef), false)
+    }
+
+    test("removeDead drops units with hp <= 0 (alive uses hp > 0)") {
+      val a = mkUQuick("player", 0, 0, 10, false, Soldier(), "A")
+      val b = mkUQuick("enemy",  1, 0, 0,  false, Soldier(), "B")
+      val c = mkUQuick("enemy",  2, 0, -3, false, Soldier(), "C")
+
+      val xs = Cons(a, Cons(b, Cons(c, Nil())))
+      val ys = removeDead(xs)
+
+      def count(us: List[gameUnbit]): Int =
+        us match {
+          case Nil() => 0
+          case Cons(_, rest) => 1 + count(rest)
+        }
+
+      assertEqual(count(ys), 1)
+    }
+
+    test("cleanupMap removes dead units from the map") {
+      val a = mkUQuick("player", 0, 0, 10, false, Soldier(), "A")
+      val b = mkUQuick("enemy",  1, 0, 0,  false, Soldier(), "B")
+      val m = mkMap(Cons(a, Cons(b, Nil())))
+
+      val m2 = cleanupMap(m)
+
+      // Only A remains
+      def has(sym: String, us: List[gameUnbit]): Bool =
+        us match {
+          case Nil() => false
+          case Cons(u, rest) => if (u.symbol == sym) true else has(sym, rest)
+        }
+
+      assertEqual(has("A", m2.units), true)
+      assertEqual(has("B", m2.units), false)
+    }
+
+    test("sideHasUnits true only if side has at least one alive unit") {
+      val a = mkUQuick("player", 0, 0, 10, false, Soldier(), "A")
+      val b = mkUQuick("player", 1, 0, 0,  false, Soldier(), "B") // dead
+      val e = mkUQuick("enemy",  2, 0, 10, false, Soldier(), "E")
+      val xs = Cons(a, Cons(b, Cons(e, Nil())))
+
+      assertEqual(sideHasUnits(xs, "player"), true)  // A alive
+      assertEqual(sideHasUnits(xs, "enemy"), true)   // E alive
+
+      val xs2 = Cons(b, Nil()) // only dead player
+      assertEqual(sideHasUnits(xs2, "player"), false)
+    }
+    test("enemyPhase: enemy attacks adjacent player (deterministic hit=100)") {
+    // Map: 3x3 floors
+    // Enemy at (1,1), Player at (1,2) => distance 1
+
+    val enemyWeapon =
+      mkWeapon(
+        "Enemy Sword",
+        Sword(),
+        Physical(),
+        5,      // attack
+        100,    // HIT=100 => always hits (randInt(100) is 0..99)
+        10,
+        0,      // CRIT=0 => never crit
+        1, 1,
+        Nil()
+      )
+
+    // Enemy: str=5, movement=0 => can't move (deterministic position)
+    val e =
+      mkUWithWeapons(
+        "enemy", 1, 1,
+        10,
+        5, 0,
+        0,
+        Soldier(),
+        "E",
+        Cons(enemyWeapon, Nil()),
+        0
+      )
+
+    // Player has NO weapon => no counter logic path (activeWeapon(defU) = None)
+    // defense=3 so damage is predictable
+    val p =
+      mkUWithWeapons(
+        "player", 1, 2,
+        10,
+        0, 3,
+        5,
+        Soldier(),
+        "P",
+        Nil(),
+        0
+      )
+
+    val map0 =
+      GameMap(
+        3, 3,
+        tiles3x3undefined(TileFloor()),
+        Cons(p, Cons(e, Nil()))
+      )
+
+    val map1 = enemyPhase(map0)
+
+    // Expected damage:
+    // baseDmg = wAtk(5) + enemy.str(5) - player.def(3) + triDmg(0) = 7
+    // no terrain, no mods, no bow/flyer multiplier
+    // hit=100 => always hit, crit=0 => no crit
+    val expectedHP = 10 - 7
+
+    // Find player in resulting map
+    def find(sym: String, us: List[gameUnbit]): Option[gameUnbit] =
+      us match {
+        case Nil() => None()
+        case Cons(u, rest) => if (u.symbol == sym) Some(u) else find(sym, rest)
+      }
+
+    val p1 = find("P", map1.units) match { case Some(u) => u case None() => p }
+    val e1 = find("E", map1.units) match { case Some(u) => u case None() => e }
+
+    assertEqual(p1.hp, expectedHP)
+    // enemy couldn't move (movement=0) so stays put
+    assertEqual(e1.x, 1)
+    assertEqual(e1.y, 1)
+  }
+}

@@ -1,0 +1,225 @@
+import test
+import src/tests/testutils
+import src/maploader
+import src/movement
+import src/model
+
+def maploaderTests() = {
+  test("maploader: parses 2x2 floor map") {
+    val txt =
+      "<Map>\n" ++
+      "<map>\n" ++
+      "ff/\n" ++
+      "ff/\n" ++
+      "</map>\n" ++
+      "</Map>\n"
+
+    val r = parseMapCapture(txt)
+
+    assertEqual(r.err.isDefined(), false)
+    assertEqual(r.map.width, 2)
+    assertEqual(r.map.height, 2)
+
+    // top-left tile should be floor
+    assertEqual(tileAt(r.map, 0, 0) match { case TileFloor() => true case _ => false }, true)
+  }
+
+  test("maploader: parses terrain letters (w,t,s,h,m)") {
+    val txt =
+      "<Map>\n<map>\n" ++
+      "wt/\n" ++
+      "sh/\n" ++
+      "</map>\n</Map>\n"
+
+    val r = parseMapCapture(txt)
+    assertEqual(r.err.isDefined(), false)
+
+    assertEqual(tileAt(r.map, 0, 0) match { case TileWall() => true case _ => false }, true)
+    assertEqual(tileAt(r.map, 1, 0) match { case TileForest() => true case _ => false }, true)
+    assertEqual(tileAt(r.map, 0, 1) match { case TileSand() => true case _ => false }, true)
+    assertEqual(tileAt(r.map, 1, 1) match { case TileHills() => true case _ => false }, true)
+  }
+
+  test("maploader: unit positions are converted from 1-based to 0-based") {
+    val txt =
+      "<Map>\n" ++
+      "<map>\n" ++
+      "ff/\n" ++
+      "ff/\n" ++
+      "</map>\n" ++
+      "<units>\n" ++
+      "<unit>\n" ++
+      "<side>player</side>\n" ++
+      "<symbol>A</symbol>\n" ++
+      "<class>soldier</class>\n" ++
+      "<x>2</x>\n" ++
+      "<y>1</y>\n" ++
+      "</unit>\n" ++
+      "</units>\n" ++
+      "</Map>\n"
+
+    val r = parseMapCapture(txt)
+    assertEqual(r.err.isDefined(), false)
+
+    // x=2,y=1 in file => (1,0) in map
+    val uOpt = unitAt(r.map.units, 1, 0)
+    assertEqual(uOpt.isDefined(), true)
+  }
+
+  test("maploader: duplicate unit symbols are rejected") {
+    val txt =
+      "<Map>\n" ++
+      "<map>\n" ++
+      "ff/\n" ++
+      "ff/\n" ++
+      "</map>\n" ++
+      "<units>\n" ++
+
+      "<unit>\n" ++
+      "<side>player</side>\n" ++
+      "<symbol>A</symbol>\n" ++
+      "<class>soldier</class>\n" ++
+      "<x>1</x>\n" ++
+      "<y>1</y>\n" ++
+      "</unit>\n" ++
+
+      "<unit>\n" ++
+      "<side>enemy</side>\n" ++
+      "<symbol>A</symbol>\n" ++
+      "<class>soldier</class>\n" ++
+      "<x>2</x>\n" ++
+      "<y>2</y>\n" ++
+      "</unit>\n" ++
+
+      "</units>\n" ++
+      "</Map>\n"
+
+    val r = parseMapCapture(txt)
+    assertEqual(r.err.isDefined(), true)
+  }
+
+  test("maploader: two units cannot occupy same tile") {
+    val txt =
+      "<Map>\n" ++
+      "<map>\n" ++
+      "ff/\n" ++
+      "ff/\n" ++
+      "</map>\n" ++
+      "<units>\n" ++
+
+      "<unit>\n" ++
+      "<side>player</side>\n" ++
+      "<symbol>A</symbol>\n" ++
+      "<class>soldier</class>\n" ++
+      "<x>1</x>\n" ++
+      "<y>1</y>\n" ++
+      "</unit>\n" ++
+
+      "<unit>\n" ++
+      "<side>enemy</side>\n" ++
+      "<symbol>B</symbol>\n" ++
+      "<class>soldier</class>\n" ++
+      "<x>1</x>\n" ++
+      "<y>1</y>\n" ++
+      "</unit>\n" ++
+
+      "</units>\n" ++
+      "</Map>\n"
+
+    val r = parseMapCapture(txt)
+    assertEqual(r.err.isDefined(), true)
+  }
+
+
+  test("maploader: unit outside map is rejected") {
+    val txt =
+      "<Map>\n" ++
+      "<map>\n" ++
+      "ff/\n" ++
+      "ff/\n" ++
+      "</map>\n" ++
+      "<units>\n" ++
+
+      "<unit>\n" ++
+      "<side>player</side>\n" ++
+      "<symbol>A</symbol>\n" ++
+      "<class>soldier</class>\n" ++
+      "<x>3</x>\n" ++
+      "<y>1</y>\n" ++
+      "</unit>\n" ++
+
+      "</units>\n" ++
+      "</Map>\n"
+
+    val r = parseMapCapture(txt)
+    assertEqual(r.err.isDefined(), true)
+  }
+
+
+  test("maploader: non-flyer cannot be placed on a wall") {
+    val txt =
+      "<Map>\n" ++
+      "<map>\n" ++
+      "wf/\n" ++
+      "ff/\n" ++
+      "</map>\n" ++
+      "<units>\n" ++
+      "<unit>\n" ++
+      "<side>player</side>\n" ++
+      "<symbol>A</symbol>\n" ++
+      "<class>soldier</class>\n" ++
+      "<x>1</x>\n" ++
+      "<y>1</y>\n" ++
+      "</unit>\n" ++
+      "</units>\n" ++
+      "</Map>\n"
+
+    val r = parseMapCapture(txt)
+    assertEqual(r.err.isDefined(), true)
+  }
+
+  test("maploader: parses weapon range and armor_break modifier") {
+    val txt =
+      "<Map>\n<map>\nff/\nff/\n</map>\n<units>\n" ++
+      "<unit>\n" ++
+      "<side>player</side>\n<symbol>A</symbol>\n<class>soldier</class>\n<x>1</x>\n<y>1</y>\n" ++
+      "<weapons>\n" ++
+      "<weapon>\n" ++
+      "<name>Hammer</name>\n" ++
+      "<kind>axe</kind>\n" ++
+      "<damageType>physical</damageType>\n" ++
+      "<attack>3</attack>\n<hit>50</hit>\n<uses>10</uses>\n<crit>0</crit>\n" ++
+      "<range>1,2</range>\n" ++
+      "<modifiers>\n<modifier>armor_break</modifier>\n</modifiers>\n" ++
+      "</weapon>\n" ++
+      "</weapons>\n" ++
+      "</unit>\n" ++
+      "</units>\n</Map>\n"
+
+    val r = parseMapCapture(txt)
+    assertEqual(r.err.isDefined(), false)
+
+    // unit at (0,0)
+    val uOpt = unitAt(r.map.units, 0, 0)
+    assertEqual(uOpt.isDefined(), true)
+
+    val u = uOpt match { case Some(x) => x case None() => mkUQuick("player",0,0,1,false,Soldier(),"X") }
+
+    // should have 1 weapon
+    u.weapons match {
+      case Cons(w, Nil()) =>
+        w.range match {
+          case (rmin, rmax) =>
+            assertEqual(rmin, 1)
+            assertEqual(rmax, 2)
+        }
+        // modifier parsed to ArmorBreak(2)
+        w.mods match {
+          case Cons(ArmorBreak(a), Nil()) => assertEqual(a, 2)
+          case _ => assertEqual(true, false)
+        }
+      case _ =>
+        assertEqual(true, false)
+    }
+}
+} 

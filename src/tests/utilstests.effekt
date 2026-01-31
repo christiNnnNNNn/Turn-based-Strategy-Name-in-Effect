@@ -1,0 +1,154 @@
+import test
+import src/tests/testutils
+import src/model
+import src/utils
+
+def utilsTests() = {
+  test("unitBySymbol finds unit with matching symbol") {
+    val a = mkUnitAtUtils("player", 0, 0, false, Soldier(), "A")
+    val b = mkUnitAtUtils("enemy",  1, 1, false, Soldier(), "B")
+    val xs = list2(a, b)
+
+    unitBySymbol(xs, "B") match {
+      case Some(u) => test::assertEqual(u.x, 1, "x should be 1")
+      case None()  => test::assertEqual(true, false, "expected Some")
+    }
+  }
+
+  test("unitBySymbol returns None when missing") {
+    val a = mkUnitAtUtils("player", 0, 0, false, Soldier(), "A")
+    val xs = Cons(a, Nil())
+
+    test::assertEqual(unitBySymbol(xs, "Z").isDefined(), false, "should be None")
+  }
+
+  test("digitOpt parses single digit") {
+    test::assertEqual(digitOpt("7").isDefined(), true, "7 should be Some")
+    test::assertEqual(digitOpt("x").isDefined(), false, "x should be None")
+  }
+
+  test("parseNatOpt parses natural numbers") {
+    parseNatOpt("123") match {
+      case Some(n) => test::assertEqual(n, 123, "123")
+      case None()  => test::assertEqual(true, false, "expected Some")
+    }
+  }
+
+  test("parseNatOpt returns None on empty or non-digit") {
+    test::assertEqual(parseNatOpt("").isDefined(), false, "empty -> None")
+    test::assertEqual(parseNatOpt("12x").isDefined(), false, "12x -> None")
+  }
+
+  test("parseIntOpt delegates to parseNatOpt (no negatives)") {
+    // your parseIntOpt is currently just parseNatOpt, so "-1" should be None
+    test::assertEqual(parseIntOpt("-1").isDefined(), false, "no negatives supported")
+    parseIntOpt("9") match {
+      case Some(n) => test::assertEqual(n, 9, "9")
+      case None()  => test::assertEqual(true, false, "expected Some")
+    }
+  }
+
+  test("extract returns substring after key") {
+    val s = "name: Alice"
+    test::assertEqual(extract(s, "name:"), "Alice", "extract after key")
+  }
+
+  test("extract returns empty string when key missing") {
+    test::assertEqual(extract("hello", "name:"), "", "missing key")
+  }
+
+  test("between extracts text between tags") {
+    val s = "<x>  42 </x>"
+    test::assertEqual(between(s, "<x>", "</x>"), "42", "between tags")
+  }
+
+  test("between returns empty string when tags missing") {
+    test::assertEqual(between("abc", "<x>", "</x>"), "", "missing tags")
+  }
+
+
+  test("inRange respects [rmin,rmax] inclusive using manhattan") {
+    val att = mkUnitAtUtils("player", 0, 0, false, Soldier(), "A")
+    val def1 = mkUnitAtUtils("enemy",  1, 0, false, Soldier(), "B")
+    val def2 = mkUnitAtUtils("enemy",  3, 0, false, Soldier(), "C")
+
+    val w = mkWeaponRange(2, 3)
+
+    test::assertEqual(inRange(att, 0, 0, def1, w), false, "dist 1 not in [2,3]")
+    test::assertEqual(inRange(att, 0, 0, def2, w), true,  "dist 3 in [2,3]")
+  }
+
+  test("collectTargets returns only enemies in range") {
+    val att = mkUnitAtUtils("player", 0, 0, false, Soldier(), "A")
+    val e1  = mkUnitAtUtils("enemy",  1, 0, false, Soldier(), "E1") 
+    val e2  = mkUnitAtUtils("enemy",  2, 0, false, Soldier(), "E2") 
+    val p2  = mkUnitAtUtils("player", 1, 1, false, Soldier(), "P2")
+
+    val w = mkWeaponRange(2, 2)
+
+    val ts = collectTargets(att, 0, 0, list3(e1, e2, p2), w)
+
+    // only E2 should be present
+    def containsSym(us: List[gameUnbit], sym: String): Bool =
+      us match {
+        case Nil() => false
+        case Cons(u, rest) => if (u.symbol == sym) true else containsSym(rest, sym)
+      }
+
+    test::assertEqual(containsSym(ts, "E2"), true, "E2 included")
+    test::assertEqual(containsSym(ts, "E1"), false, "E1 excluded")
+    test::assertEqual(containsSym(ts, "P2"), false, "ally excluded")
+  }
+
+  test("maxOption returns None on empty list") {
+    test::assertEqual(maxOption(Nil()).isDefined(), false, "empty -> None")
+  }
+
+  test("maxOption returns maximum") {
+    val xs = Cons(3, Cons(10, Cons(7, Nil())))
+    maxOption(xs) match {
+      case Some(m) => test::assertEqual(m, 10, "max is 10")
+      case None()  => test::assertEqual(true, false, "expected Some")
+    }
+  }
+
+  test("digit returns 0..9 and 0 fallback") {
+    test::assertEqual(digit("5"), 5, "digit 5")
+    test::assertEqual(digit("x"), 0, "fallback 0")
+  }
+
+  test("ptoInt parses positive numbers") {
+    test::assertEqual(ptoInt("123"), 123, "123")
+    test::assertEqual(ptoInt("  9 "), 9, "trim")
+  }
+
+  test("ptoInt parses negative numbers") {
+    test::assertEqual(ptoInt("-12"), -12, "-12")
+  }
+
+  test("unitSymbol returns symbol") {
+    val u = mkUnitAtUtils("player", 0, 0, false, Soldier(), "ZZ")
+    test::assertEqual(unitSymbol(u), "ZZ", "symbol")
+  }
+
+  test("dropEmpty removes blanks and keeps non-blank") {
+    val xs =
+      Cons("",
+      Cons("  ",
+      Cons("a",
+      Cons(" b ",
+      Nil()))))
+
+    val ys = dropEmpty(xs)
+
+    def to2(ls: List[String]): (String, String) =
+      ls match {
+        case Cons(a, Cons(b, Nil())) => (a, b)
+        case _ => ("", "")
+      }
+
+    val (a, b) = to2(ys)
+    test::assertEqual(a, "a", "kept a")
+    test::assertEqual(b, " b ", "kept b (not trimmed)")
+  }
+}

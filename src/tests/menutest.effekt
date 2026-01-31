@@ -1,0 +1,179 @@
+module menutest
+
+import src/model
+import src/movement
+import src/renderer
+import src/combat
+import src/gamestate
+import src/utils
+import src/weaponhandling
+import string
+
+effect UIReadLine(): String
+effect UIWrite(s: String): Unit
+
+def w(s: String): Unit / { UIWrite } = do UIWrite(s)
+def r(): String / { UIReadLine } = do UIReadLine()
+
+def runMenuTest(
+  map: GameMap,
+  selected: Option[gameUnbit],
+  reachable: List[TilePos],
+  moveState: Option[MoveState],
+  combatState: Option[CombatState]
+): Unit / { UIReadLine, UIWrite } = {
+
+  def parseInput(line: String, combatState: Option[CombatState], moveState: Option[MoveState]): UIAction = {
+    val trimmed = line.trim()
+
+    combatState match {
+      case Some(_) =>
+        if (trimmed == "f") ConfirmCombat()
+        else if (trimmed == "g") CancelCombat()
+        else CancelCombat()
+
+      case None() =>
+        if (trimmed == "q") Quit()
+        else if (trimmed == "m") ShowMovement()
+        else if (trimmed == "w") MoveCursor(0, -1)
+        else if (trimmed == "s") MoveCursor(0, 1)
+        else if (trimmed == "a") MoveCursor(-1, 0)
+        else if (trimmed == "d") MoveCursor(1, 0)
+        else if (trimmed == "r") ConfirmMove()
+        else if (trimmed == "t") ListTargets()
+        else if (trimmed == "h") Help()
+        else if (trimmed == "x") EndTurn()
+        else if (trimmed == "c") CancelMove()
+        else {
+          val toks = dropEmpty(split(trimmed, " "))
+
+          toks match {
+            case Cons("s", Cons(sym, Nil())) =>
+              val s0 = sym.trim()
+              if (s0.length() == 0) ShowMovement()
+              else {
+                unitBySymbol(map.units, s0) match {
+                  case Some(u) => SelectUnit(u.x, u.y)
+                  case None()  => ShowMovement()
+                }
+              }
+
+            case Cons(n, Nil()) =>
+              parseIntOpt(n) match {
+                case Some(i) => SwitchWeapon(i - 1)
+                case None()  => ShowMovement()
+              }
+
+            case _ =>
+              ShowMovement()
+          }
+        }
+    }
+  }
+
+
+  val buffer = ref(makeBuffer(map.width, map.height))
+  withConsole(buffer, map, selected, reachable, moveState)
+
+  selected match {
+    case Some(u) =>
+
+      printUnitStats(u)
+      printWeapons(u)
+    case None() =>
+      w("\n(No unit selected)\n")
+  }
+
+  moveState match {
+    case Some(Moving(_, _, _, _, _, rem)) =>
+      w("\nRemaining movement: " ++ rem.show ++ "\n")
+    case None() => ()
+  }
+
+  printBuffer(buffer.get()) 
+
+  val line = r()
+  val action = parseInput(line, combatState, moveState)
+
+  action match {
+    case Quit() =>
+      w("Bye!\n")
+      ()
+
+    case Help() =>
+      printHelp() 
+      runMenuTest(map, selected, reachable, moveState, combatState)
+
+    case SelectUnit(x, y) =>
+      val selOpt = unitAt(map.units, x, y)
+      val newSelected =
+        selOpt match {
+          case Some(u) =>
+            if (u.side == "player" && u.moved) { w("That unit already moved this turn.\n"); None() }
+            else Some(u)
+          case None() => None()
+        }
+      runMenuTest(map, newSelected, Nil(), None(), None())
+
+    case ShowMovement() =>
+      val newReachable =
+        selected match {
+          case Some(u) => withGroundMovement(map, u)
+          case None()  => Nil()
+        }
+
+      val newMoveState =
+        selected match {
+          case Some(u) => if (u.side == "player") Some(Moving(u, u.x, u.y, u.x, u.y, u.movement)) else None()
+          case None()  => None()
+        }
+
+      runMenuTest(map, selected, newReachable, newMoveState, None())
+
+    case MoveCursor(dx, dy) =>
+      moveState match {
+        case Some(Moving(u, sx, sy, cx, cy, rem)) =>
+          val nx = cx + dx
+          val ny = cy + dy
+
+          val newRem =
+            withUnitMovementRules(map, u, u.x, u.y) { tryMove(nx, ny, rem) }
+
+          val nextState =
+            if (newRem >= 0 && newRem < rem) Some(Moving(u, sx, sy, nx, ny, newRem))
+            else moveState
+
+          runMenuTest(map, selected, reachable, nextState, None())
+        case None() =>
+          runMenuTest(map, selected, reachable, None(), None())
+      }
+
+    case CancelMove() =>
+      runMenuTest(map, selected, reachable, None(), None())
+
+    case ConfirmMove() =>
+      moveState match {
+        case Some(Moving(u, sx, sy, cx, cy, _)) =>
+          val moved = setPosMoved(u, cx, cy, true)
+          val newUnits = replaceUnit(map.units, sx, sy, moved)
+          val newMap = GameMap(map.width, map.height, map.tiles, newUnits)
+          runMenuTest(newMap, Some(moved), Nil(), None(), None())
+        case None() =>
+          runMenuTest(map, selected, reachable, None(), None())
+      }
+
+    case SwitchWeapon(i) =>
+      selected match {
+        case Some(u) =>
+          val updated = switchWeapon(u, i)
+          val newUnits = replaceUnit(map.units, u.x, u.y, updated)
+          val newMap = GameMap(map.width, map.height, map.tiles, newUnits)
+          runMenuTest(newMap, Some(updated), reachable, moveState, None())
+        case None() =>
+          runMenuTest(map, selected, reachable, moveState, None())
+      }
+
+    case _ =>
+      runMenuTest(map, selected, reachable, moveState, combatState)
+  }
+}

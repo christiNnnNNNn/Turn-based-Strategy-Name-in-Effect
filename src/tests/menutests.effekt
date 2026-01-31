@@ -1,0 +1,94 @@
+import test
+import src/tests/testutils
+import src/gamestate
+import src/model
+import src/movement
+import src/utils
+import src/combat
+
+def menuTests() = {
+  test("help key returns Help action") {
+      val a = parseInputPure("h", None(), None(), Nil())
+      assertEqual(a, Help())
+  }
+
+  test("movement keys map correctly") {
+    assertEqual(parseInputPure("w", None(), None(), Nil()), MoveCursor(0, -1))
+    assertEqual(parseInputPure("s", None(), None(), Nil()), MoveCursor(0, 1))
+    assertEqual(parseInputPure("a", None(), None(), Nil()), MoveCursor(-1, 0))
+    assertEqual(parseInputPure("d", None(), None(), Nil()), MoveCursor(1, 0))
+  }
+
+  test("end turn key returns EndTurn") {
+    val a = parseInputPure("x", None(), None(), Nil())
+    assertEqual(a, EndTurn())
+  }
+
+  test("weapon index input switches weapon (1-based)") {
+    val a = parseInputPure("2", None(), None(), Nil())
+    assertEqual(a, SwitchWeapon(1))
+  }
+
+  test("invalid number input falls back to ShowMovement") {
+    val a = parseInputPure("abc", None(), None(), Nil())
+    assertEqual(a, ShowMovement())
+  }
+
+  test("select unit by symbol works") {
+    val u = mkUnitQuick("player", 3, 4, "A")
+    val xs = Cons(u, Nil())
+
+    val a = parseInputPure("s A", None(), None(), xs)
+    assertEqual(a, SelectUnit(3, 4))
+  }
+
+  test("select unknown symbol falls back to ShowMovement") {
+    val u = mkUnitQuick("player", 1, 1, "A")
+    val xs = Cons(u, Nil())
+
+    val a = parseInputPure("s Z", None(), None(), xs)
+    assertEqual(a, ShowMovement())
+  }
+
+  test("combat mode: f confirms combat") {
+    val cs = CombatState(
+      mkUnitQuick("player", 0, 0, "A"),
+      0, 0, 0, 0,
+      mkUnitQuick("enemy", 1, 1, "E"),
+      Weapon("x", Sword(), Physical(), 0, 0, 1, 0, (1,1), Nil()),
+      Weapon("x", Sword(), Physical(), 0, 0, 1, 0, (1,1), Nil()),
+      CombatPreview(1, 1, 1)
+    )
+
+    val a = parseInputPure("f", Some(cs), None(), Nil())
+    assertEqual(a, ConfirmCombat())
+  }
+
+  test("combat mode: g cancels combat") {
+    val cs = CombatState(
+      mkUnitQuick("player", 0, 0, "A"),
+      0, 0, 0, 0,
+      mkUnitQuick("enemy", 1, 1, "E"),
+      Weapon("x", Sword(), Physical(), 0, 0, 1, 0, (1,1), Nil()),
+      Weapon("x", Sword(), Physical(), 0, 0, 1, 0, (1,1), Nil()),
+      CombatPreview(1, 1, 1)
+    )
+
+    val a = parseInputPure("g", Some(cs), None(), Nil())
+    assertEqual(a, CancelCombat())
+  }
+
+  test("combat mode: other input defaults to CancelCombat") {
+    val cs = CombatState(
+      mkUnitQuick("player", 0, 0, "A"),
+      0, 0, 0, 0,
+      mkUnitQuick("enemy", 1, 1, "E"),
+      Weapon("x", Sword(), Physical(), 0, 0, 1, 0, (1,1), Nil()),
+      Weapon("x", Sword(), Physical(), 0, 0, 1, 0, (1,1), Nil()),
+      CombatPreview(1, 1, 1)
+    )
+
+    val a = parseInputPure("x", Some(cs), None(), Nil())
+    assertEqual(a, CancelCombat())
+  }
+}

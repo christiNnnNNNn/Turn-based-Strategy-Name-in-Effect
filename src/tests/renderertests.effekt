@@ -1,0 +1,177 @@
+import test
+import src/tests/testutils
+import src/renderer
+import src/model
+import src/gamestate
+
+def rendererTests() = {
+  test("ansiFg and ansiBg return non-empty escape codes for known colors") {
+    assertEqual(ansiFg("white").length() > 0, true)
+    assertEqual(ansiFg("red").length() > 0, true)
+    assertEqual(ansiBg("white").length() > 0, true)
+    assertEqual(ansiBg("purple").length() > 0, true)
+  }
+
+  test("emptyCell is space with white fg and black bg") {
+    val c = emptyCell()
+    assertEqual(c.char, " ")
+    assertEqual(c.fg, "white")
+    assertEqual(c.bg, "black")
+  }
+
+  test("makeBuffer creates correct dimensions and default cells") {
+    val b = makeBuffer(3, 2)
+    assertCell(b, 0, 0, " ", "white", "black")
+    assertCell(b, 2, 1, " ", "white", "black")
+  }
+
+  test("setCell updates one cell without changing others") {
+    val b0 = makeBuffer(3, 3)
+    val b1 = setCell(b0, 1, 1, Cell("X", "red", "green", ""))
+    assertCell(b1, 1, 1, "X", "red", "green")
+    // neighbor untouched
+    assertCell(b1, 0, 0, " ", "white", "black")
+  }
+
+  test("renderMap emits DrawTile for correct fills per tile type") {
+    val ts =
+      tiles3x3(
+        TileFloor(),  TileWall(),   TileForest(),
+        TileSand(),   TileHills(),  TileMarsh(),
+        TileFloor(),  TileFloor(),  TileFloor()
+      )
+    val m = mkMap3(ts, Nil())
+
+    val drawn = ref[List[(Int,Int,String,String)]](Nil())
+
+    try { renderMap(m) }
+    with DrawTile { (x, y, fill, outline) =>
+      drawn.set(Cons((x,y,fill,outline), drawn.get()))
+      resume(())
+    }
+
+    val ds = drawn.get()
+    assertEqual(containsTileDraw(ds, 0, 0, "white"), true)
+    assertEqual(containsTileDraw(ds, 1, 0, "gray"), true)
+    assertEqual(containsTileDraw(ds, 2, 0, "green"), true)
+    assertEqual(containsTileDraw(ds, 0, 1, "yellow"), true)
+    assertEqual(containsTileDraw(ds, 1, 1, "brown"), true)
+    assertEqual(containsTileDraw(ds, 2, 1, "purple"), true)
+  }
+
+  test("renderUnit emits DrawUnit at unit position with first char of symbol") {
+    val u = mkUnitAtRender("player", 2, 1, false, Soldier(), "AB") // should draw "A"
+    val calls = ref[List[(Int,Int,String,String)]](Nil())
+
+    try { renderUnit(u, "blue") }
+    with DrawUnit { (x, y, ch, color) =>
+      calls.set(Cons((x,y,ch,color), calls.get()))
+      resume(())
+    }
+
+    assertEqual(containsUnitDraw(calls.get(), 2, 1, "A", "blue"), true)
+  }
+
+  test("withConsole draws tiles into buffer with '.' and bg fill") {
+    val ts =
+      tiles3x3(
+        TileFloor(), TileWall(),  TileForest(),
+        TileSand(),  TileHills(), TileMarsh(),
+        TileFloor(), TileFloor(), TileFloor()
+      )
+    val m = mkMap3(ts, Nil())
+
+    val buf = ref(makeBuffer(3,3))
+
+    withConsole(buf, m, None(), Nil(), None())
+
+    // In your handlers: DrawTile sets Cell(".", "white", fill, "")
+    assertCell(buf.get(), 0, 0, ".", "white", "white")
+    assertCell(buf.get(), 1, 0, ".", "white", "gray")
+    assertCell(buf.get(), 2, 0, ".", "white", "green")
+    assertCell(buf.get(), 0, 1, ".", "white", "yellow")
+    assertCell(buf.get(), 1, 1, ".", "white", "brown")
+    assertCell(buf.get(), 2, 1, ".", "white", "purple")
+  }
+
+  test("withConsole highlights reachable tiles with chosen color") {
+    val ts =
+      tiles3x3(
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor()
+      )
+    val m = mkMap3(ts, Nil())
+
+    val buf = ref(makeBuffer(3,3))
+    val reach = Cons(tp(1,1), Cons(tp(2,2), Nil()))
+
+    withConsole(buf, m, None(), reach, None())
+
+    // HighlightTile handler sets Cell(".", "white", color, "")
+    assertCell(buf.get(), 1, 1, ".", "white", "blue") // default reachColor when selected=None is "blue"
+    assertCell(buf.get(), 2, 2, ".", "white", "blue")
+  }
+
+  test("withConsole unit colors: selected unit is yellow, enemy red, moved player black, normal player blue") {
+    val ts =
+      tiles3x3(
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor()
+      )
+
+    val pSel   = mkUnitAtRender("player", 0, 0, false, Soldier(), "A")
+    val pMoved = mkUnitAtRender("player", 1, 0, true,  Soldier(), "B")
+    val pNorm  = mkUnitAtRender("player", 2, 0, false, Soldier(), "C")
+    val enemy  = mkUnitAtRender("enemy",  0, 1, false, Soldier(), "E")
+
+    val units = Cons(pSel, Cons(pMoved, Cons(pNorm, Cons(enemy, Nil()))))
+    val m = mkMap3(ts, units)
+
+    val buf = ref(makeBuffer(3,3))
+    withConsole(buf, m, Some(pSel), Nil(), None())
+
+    // DrawUnit keeps existing bg from tile, sets fg=color, char=first symbol, style=ansiBold()
+    val cSel = cellAt(buf.get(), 0, 0)
+    assertEqual(cSel.char, "A")
+    assertEqual(cSel.fg, "yellow")
+
+    val cMoved = cellAt(buf.get(), 1, 0)
+    assertEqual(cMoved.char, "B")
+    assertEqual(cMoved.fg, "black")
+
+    val cNorm = cellAt(buf.get(), 2, 0)
+    assertEqual(cNorm.char, "C")
+    assertEqual(cNorm.fg, "blue")
+
+    val cEnemy = cellAt(buf.get(), 0, 1)
+    assertEqual(cEnemy.char, "E")
+    assertEqual(cEnemy.fg, "red")
+  }
+
+  test("withConsole in moveState highlights cursor tile black") {
+    val ts =
+      tiles3x3(
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor()
+      )
+    val u = mkUnitAtRender("player", 0, 0, false, Soldier(), "A")
+    val m = mkMap3(ts, Cons(u, Nil()))
+
+    val buf = ref(makeBuffer(3,3))
+    val ms = Some(Moving(u, 0, 0, 2, 1, 3))
+
+    withConsole(buf, m, Some(u), Nil(), ms)
+
+    // Move cursor highlight uses HighlightTile(x,y,"black") -> Cell(".", "white", "black", "")
+    assertCell(buf.get(), 2, 1, ".", "white", "black")
+  }
+
+  test("modsToString joins labels with comma+space") {
+    val ms = Cons(ArmorBreak(2), Cons(ExtraCrit(7), Nil()))
+    val s = modsToString(ms)
+    assertEqual(s, "armor_break(2), crit+7")
+  }
+}

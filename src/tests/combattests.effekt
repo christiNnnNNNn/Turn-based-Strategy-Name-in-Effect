@@ -1,0 +1,163 @@
+import test
+import src/tests/testutils
+import src/combat
+import src/model
+
+def combatTests()  = {
+  test("applyDamage clamps hp at 0") {
+    val u  = mkUnit("player", 0, 0, 5, 1, 1, 1, 1, 1, 1, 1, 5, Soldier(), "A")
+    val u2 = applyDamage(u, 999)
+    assertEqual(u2.hp, 0)
+  }
+
+  test("triangle bonus: sword vs axe gives +1 dmg and +15 hit") {
+    val map = mkMapWithDefTile(TileFloor())
+
+    val att = mkUnit("player", 0, 0, 10, 5, 0, 0, 0, 10, 0, 0, 5, Soldier(), "A")
+    val defU = mkUnit("enemy",  1, 1, 10, 0, 0, 2, 0,  0, 0, 0, 5, Soldier(), "B")
+
+    val wAtt = mkWeapon("Sword", Sword(), Physical(), 3, 80, 10, 5, 1, 1, Nil())
+    val wDef = mkWeapon("Axe",   Axe(),   Physical(), 3, 80, 10, 5, 1, 1, Nil())
+
+    val p = previewPure(map, att, defU, wAtt, wDef)
+
+    // baseDmg = atk(3) + str(5) - def(2) + triDmg(1) = 7
+    assertEqual(p.dmg, 7)
+
+    // baseHit = hit(80) + pre(10) - agi(0) + triHit(15) = 105
+    assertEqual(p.hit, 105)
+  }
+
+  test("terrain: forest reduces dmg by 1 and hit by 15") {
+    val map = mkMapWithDefTile(TileForest())
+
+    val att = mkUnit("player", 0, 0, 10, 5, 0, 0, 0, 10, 0, 0, 5, Soldier(), "A")
+    val defU = mkUnit("enemy",  1, 1, 10, 0, 0, 2, 0,  0, 0, 0, 5, Soldier(), "B")
+
+    val wAtt = mkWeapon("Sword", Sword(), Physical(), 3, 80, 10, 5, 1, 1, Nil())
+    val wDef = mkWeapon("Sword", Sword(), Physical(), 3, 80, 10, 5, 1, 1, Nil())
+
+    val p = previewPure(map, att, defU, wAtt, wDef)
+
+    // Without terrain and triangle:
+    // baseDmg = 3+5-2+0 = 6, forest dmg delta = -1 => 5
+    assertEqual(p.dmg, 5)
+
+    // baseHit = 80+10-0+0 = 90, forest hit delta = -15 => 75
+    assertEqual(p.hit, 75)
+  }
+
+  test("terrain: marsh increases hit by 15") {
+    val map = mkMapWithDefTile(TileMarsh())
+
+    val att = mkUnit("player", 0, 0, 10, 1, 0, 0, 0, 10, 0, 0, 5, Soldier(), "A")
+    val defU = mkUnit("enemy",  1, 1, 10, 0, 0, 0, 0,  0, 0, 0, 5, Soldier(), "B")
+
+    val wAtt = mkWeapon("Sword", Sword(), Physical(), 0, 50, 10, 0, 1, 1, Nil())
+    val wDef = mkWeapon("Sword", Sword(), Physical(), 0, 50, 10, 0, 1, 1, Nil())
+
+    val p = previewPure(map, att, defU, wAtt, wDef)
+
+    // baseHit = 50 + 10 - 0 + 0 = 60, marsh delta +15 => 75
+    assertEqual(p.hit, 75)
+  }
+
+  test("mods: armor_break + anti_armor apply vs Armor defender") {
+    val map = mkMapWithDefTile(TileFloor())
+
+    val att = mkUnit("player", 0, 0, 10, 5, 0, 0, 0, 0, 0, 0, 5, Soldier(), "A")
+    val defU = mkUnit("enemy",  1, 1, 10, 0, 0, 2, 0, 0, 0, 0, 5, Armor(), "B")
+
+    // Base dmg (no triangle, no terrain):
+    // 3 + 5 - 2 = 6
+    // + ArmorBreak(2) => 8
+    // + AntiArmor(3) because defender Armor => 11
+    val mods = mods2(ArmorBreak(2), AntiArmor(3))
+    val wAtt = mkWeapon("Hammer", Axe(), Physical(), 3, 50, 10, 0, 1, 1, mods)
+    val wDef = mkWeapon("Axe",    Axe(), Physical(), 3, 50, 10, 0, 1, 1, Nil())
+
+    val p = previewPure(map, att, defU, wAtt, wDef)
+    assertEqual(p.dmg, 11)
+  }
+
+  test("mods: mounted bonus applies when attacker is Knight") {
+    val map = mkMapWithDefTile(TileFloor())
+
+    val att = mkUnit("player", 0, 0, 10, 5, 0, 0, 0, 0, 0, 0, 5, Knight(), "A")
+    val defU = mkUnit("enemy",  1, 1, 10, 0, 0, 2, 0, 0, 0, 0, 5, Soldier(), "B")
+
+    // Base dmg: 3 + 5 - 2 = 6
+    // + MountedBonus(4) because attacker Knight => 10
+    val wAtt = mkWeapon("Lance", Lance(), Physical(), 3, 50, 10, 0, 1, 1, mods1(MountedBonus(4)))
+    val wDef = mkWeapon("Lance", Lance(), Physical(), 3, 50, 10, 0, 1, 1, Nil())
+
+    val p = previewPure(map, att, defU, wAtt, wDef)
+    assertEqual(p.dmg, 10)
+  }
+
+  test("mods: extra crit increases preview crit") {
+    val map = mkMapWithDefTile(TileFloor())
+
+    val att = mkUnit("player", 0, 0, 10, 0, 0, 0, 0, 0, 0, 10, 5, Soldier(), "A")
+    val defU = mkUnit("enemy",  1, 1, 10, 0, 0, 0, 0, 0, 0,  0, 5, Soldier(), "B")
+
+    // baseCrit = att.luck(10) - def.luck(0) + w.crit(5) = 15
+    // + ExtraCrit(7) => 22
+    val wAtt = mkWeapon("Knife", Sword(), Physical(), 0, 50, 10, 5, 1, 1, mods1(ExtraCrit(7)))
+    val wDef = mkWeapon("Knife", Sword(), Physical(), 0, 50, 10, 0, 1, 1, Nil())
+
+    val p = previewPure(map, att, defU, wAtt, wDef)
+    assertEqual(p.crit, 22)
+  }
+
+  test("bow vs flyer doubles damage") {
+    val map = mkMapWithDefTile(TileFloor())
+
+    val att = mkUnit("player", 0, 0, 10, 5, 0, 0, 0, 0, 0, 0, 5, Soldier(), "A")
+    val defU = mkUnit("enemy",  1, 1, 10, 0, 0, 1, 0, 0, 0, 0, 5, Flyer(), "B")
+
+    // Base dmg: 3 + 5 - 1 = 7
+    // Bow vs flyer => 14
+    val wAtt = mkWeapon("Bow", Bow(), Physical(), 3, 50, 10, 0, 2, 2, Nil())
+    val wDef = mkWeapon("Bow", Bow(), Physical(), 0, 50, 10, 0, 2, 2, Nil())
+
+    val p = previewPure(map, att, defU, wAtt, wDef)
+    assertEqual(p.dmg, 14)
+  }
+
+  test("resolveAttack: miss when h >= hit") {
+    val att = mkUnit("player", 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 5, Soldier(), "A")
+    val defU = mkUnit("enemy",  1, 1, 10, 0, 0, 0, 0, 0, 0, 0, 5, Soldier(), "B")
+    val p = CombatPreview(5, 30, 10)
+
+    // h=30 => h >= hit => miss
+    val r = resolveAttackDet2(att, defU, p, 30, 0)
+    assertEqual(r.hit, false)
+    assertEqual(r.crit, false)
+    assertEqual(r.damage, 0)
+  }
+
+  test("resolveAttack: hit but not crit when h < hit and c >= crit") {
+    val att = mkUnit("player", 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 5, Soldier(), "A")
+    val defU = mkUnit("enemy",  1, 1, 10, 0, 0, 0, 0, 0, 0, 0, 5, Soldier(), "B")
+    val p = CombatPreview(5, 80, 10)
+
+    // h=0 => hit; c=10 => c < crit? no (since crit=10, need <10)
+    val r = resolveAttackDet2(att, defU, p, 0, 10)
+    assertEqual(r.hit, true)
+    assertEqual(r.crit, false)
+    assertEqual(r.damage, 5)
+  }
+
+  test("resolveAttack: crit when h < hit and c < crit") {
+    val att = mkUnit("player", 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 5, Soldier(), "A")
+    val defU = mkUnit("enemy",  1, 1, 10, 0, 0, 0, 0, 0, 0, 0, 5, Soldier(), "B")
+    val p = CombatPreview(5, 80, 10)
+
+    // h=0 => hit; c=0 => crit (0 < 10)
+    val r = resolveAttackDet2(att, defU, p, 0, 0)
+    assertEqual(r.hit, true)
+    assertEqual(r.crit, true)
+    assertEqual(r.damage, 15)
+  }
+}

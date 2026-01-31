@@ -1,0 +1,99 @@
+import test
+import src/model
+import src/tests/testutils
+import src/tests/menutest   
+
+def menuEndToEndTests()= {
+
+  // Run the menu with a scripted list of inputs, capture only UIWrite output.
+  // (Anything printed via printString inside renderer/stats/help will NOT be captured.)
+  def runMenuScript(startMap: GameMap, inputs: List[String]): String / { test::Assertion } = {
+    val inRef  = ref(inputs)
+    val outRef = ref("")
+
+    def popLine(): String =
+      inRef.get() match {
+        case Nil() => "q"                  // safety quit
+        case Cons(h, t) => inRef.set(t); h
+      }
+
+    // Drive the menu with effect handlers
+    try {
+      menutest::runMenuTest(startMap, None(), Nil(), None(), None())
+    }
+    with menutest::UIReadLine { () =>
+      resume(popLine())
+    }
+    with menutest::UIWrite { s =>
+      outRef.set(outRef.get() ++ s)
+      resume(())
+    }
+
+    outRef.get()
+  }
+
+  test("E2E: immediate quit prints Bye") {
+    val a = mkUnitAt("player", 0, 0, false, Soldier(), "A")
+    val m = mkMap2(list1(a))
+
+    val out = runMenuScript(m, list1("q"))
+
+    assertContains(out, "(No unit selected)", "shows no-selection line before first input")
+    assertContains(out, "Bye!", "prints Bye on quit")
+  }
+
+  test("E2E: move a unit, then selecting it again warns 'already moved'") {
+  val a = mkUnitAt("player", 0, 0, false, Soldier(), "A")
+  val m = mkMap2(list1(a))
+
+  val inputs =
+    Cons("s A",
+    Cons("m",
+    Cons("d",
+    Cons("r",
+    Cons("s A",
+    Cons("q", Nil()))))))
+
+  val out = runMenuScript(m, inputs)
+
+  assertContains(
+    out,
+    "That unit already moved this turn.",
+    "warns when selecting a moved player unit"
+  )
+
+  assertContains(out, "Bye!", "eventually quits")
+}
+
+  test("E2E: cancel move mode returns to normal loop and can quit") {
+    val a = mkUnitAt("player", 0, 0, false, Soldier(), "A")
+    val m = mkMap2(list1(a))
+
+    // select -> move mode -> cancel -> quit
+    val inputs =
+      Cons("s A",
+      Cons("m",
+      Cons("c",
+      Cons("q", Nil()))))
+
+    val out = runMenuScript(m, inputs)
+
+    assertContains(out, "Remaining movement:", "move mode prints remaining movement via UIWrite")
+    assertContains(out, "Bye!", "quits after cancel")
+  }
+
+  test("E2E: invalid selection falls back safely, can still quit") {
+    // No units with symbol Z
+    val a = mkUnitAt("player", 0, 0, false, Soldier(), "A")
+    val m = mkMap2(list1(a))
+
+    // try selecting unknown symbol, then quit
+    val inputs =
+      Cons("s Z",
+      Cons("q", Nil()))
+
+    val out = runMenuScript(m, inputs)
+
+    assertContains(out, "Bye!", "quits even after invalid input")
+  }
+}

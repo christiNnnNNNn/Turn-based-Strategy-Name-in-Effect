@@ -1,0 +1,209 @@
+import test
+import src/tests/testutils
+import src/utils
+import src/movement
+import src/model
+def movementTests() = {
+  test("listGet returns Some for in-bounds and None for out-of-bounds") {
+    val xs = Cons(10, Cons(20, Cons(30, Nil())))
+    assertEqual(listGet(xs, 0), Some(10))
+    assertEqual(listGet(xs, 2), Some(30))
+    assertEqual(listGet(xs, 3), None())
+    assertEqual(listGet(xs, -1), None())
+  }
+
+  test("tileAt returns TileWall for out-of-bounds") {
+    val ts =
+      tiles3x3(
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileForest(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor()
+      )
+    val m = mkMap3(ts, Nil())
+
+    assertEqual(tileAt(m, -1, 0), TileWall())
+    assertEqual(tileAt(m, 0, -1), TileWall())
+    assertEqual(tileAt(m, 3, 0), TileWall())
+    assertEqual(tileAt(m, 0, 3), TileWall())
+  }
+
+  test("classMoveMode maps classes correctly") {
+    assertEqual(classMoveMode(Soldier()), Foot())
+    assertEqual(classMoveMode(Armor()), Heavy())
+    assertEqual(classMoveMode(Knight()), Cavalry())
+    assertEqual(classMoveMode(Flyer()), Flying())
+  }
+
+  test("terrainCost matches design") {
+    assertEqual(terrainCost(TileFloor()), 1)
+    assertEqual(terrainCost(TileSand()), 2)
+    assertEqual(terrainCost(TileHills()), 2)
+    assertEqual(terrainCost(TileForest()), 3)
+    assertEqual(terrainCost(TileMarsh()), 3)
+    assertEqual(terrainCost(TileWall()), 999)
+  }
+
+  test("terrainPassableForFoot blocks walls only") {
+    assertEqual(terrainPassableForFoot(TileWall()), false)
+    assertEqual(terrainPassableForFoot(TileForest()), true)
+    assertEqual(terrainPassableForFoot(TileFloor()), true)
+  }
+
+  test("tryMove subtracts cost when canEnter is true") {
+    val r =
+      try { tryMove(1, 1, 5) }
+      with canEnter { (_, _) => resume(true) }
+      with moveCost { (_, _) => resume(2) }
+
+    assertEqual(r, 3)
+  }
+
+  test("tryMove keeps remaining when canEnter is false") {
+    val r =
+      try { tryMove(1, 1, 5) }
+      with canEnter { (_, _) => resume(false) }
+      with moveCost { (_, _) => resume(999) } // should not matter
+
+    assertEqual(r, 5)
+  }
+
+  test("unitAt finds unit at coordinates") {
+    val a = mkUnitAt(1, 2, 5, Soldier(), "A")
+    val b = mkUnitAt(0, 0, 5, Soldier(), "B")
+    val xs = Cons(a, Cons(b, Nil()))
+
+    unitAt(xs, 1, 2) match {
+      case Some(u) => assertEqual(u.symbol, "A")
+      case None()  => assertEqual(true, false)
+    }
+
+    assertEqual(unitAt(xs, 2, 2).isDefined(), false)
+  }
+
+  test("withUnitMovementRules: Foot cannot enter walls, Flyer can") {
+    val ts =
+      tiles3x3(
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileWall(),  TileFloor(),
+        TileFloor(), TileFloor(), TileFloor()
+      )
+
+    val foot = mkUnitAt(0, 0, 5, Soldier(), "F")
+    val fly  = mkUnitAt(0, 0, 5, Flyer(), "Y")
+    val m = mkMap3(ts, Nil())
+
+    val footCan =
+      withUnitMovementRules(m, foot, foot.x, foot.y) { () =>
+        do canEnter(1, 1)
+      }
+    val flyCan =
+      withUnitMovementRules(m, fly, fly.x, fly.y) { () =>
+        do canEnter(1, 1)
+      }
+
+    assertEqual(footCan, false)
+    assertEqual(flyCan, true)
+  }
+
+  test("withUnitMovementRules: occupied tiles are blocked (except start tile)") {
+    val ts =
+      tiles3x3(
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor()
+      )
+
+    val mover = mkUnitAt(0, 0, 5, Soldier(), "M")
+    val block = mkUnitAt(1, 0, 5, Soldier(), "B")
+    val m = mkMap3(ts, Cons(mover, Cons(block, Nil())))
+
+    // blocked by other unit
+    val b1 =
+      withUnitMovementRules(m, mover, mover.x, mover.y) { () =>
+        do canEnter(1, 0)
+      }
+    assertEqual(b1, false)
+
+    // start tile allowed even though occupied by self
+    val b2 =
+      withUnitMovementRules(m, mover, mover.x, mover.y) { () =>
+        do canEnter(0, 0)
+      }
+    assertEqual(b2, true)
+  }
+
+  test("withUnitMovementRules: moveCost differs by class (Flying always 1, Heavy adds +1)") {
+    val ts =
+      tiles3x3(
+        TileFloor(), TileSand(),  TileForest(),
+        TileHills(), TileMarsh(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor()
+      )
+
+    val fly  = mkUnitAt(0, 0, 5, Flyer(), "Y")
+    val heavy = mkUnitAt(0, 0, 5, Armor(), "H")
+    val foot = mkUnitAt(0, 0, 5, Soldier(), "F")
+    val cav  = mkUnitAt(0, 0, 5, Knight(), "C")
+
+    val m = mkMap3(ts, Nil())
+
+    val cFly =
+      withUnitMovementRules(m, fly, fly.x, fly.y) { () => do moveCost(1, 0) } // sand
+    val cHeavy =
+      withUnitMovementRules(m, heavy, heavy.x, heavy.y) { () => do moveCost(1, 0) } // sand
+    val cFoot =
+      withUnitMovementRules(m, foot, foot.x, foot.y) { () => do moveCost(1, 0) } // sand
+    val cCav =
+      withUnitMovementRules(m, cav, cav.x, cav.y) { () => do moveCost(1, 0) } // sand
+
+    // sand: base=2
+    assertEqual(cFly, 1)      // flying always 1
+    assertEqual(cFoot, 2)     // foot uses terrainCost
+    assertEqual(cHeavy, 3)    // heavy base +1
+    assertEqual(cCav, 3)      // cavalry sand => 3 (per your table)
+  }
+
+  test("reachableTiles with trivial rules includes origin and 4-neighbors within movement 1") {
+    val rs =
+      try { reachableTiles(1, 1, 1) }
+      with canEnter { (_, _) => resume(true) }
+      with moveCost { (_, _) => resume(1) }
+
+    // Should include (1,1) and the 4 neighbors (in any order, may include duplicates due to implementation)
+    assertEqual(hasPos(rs, 1, 1), true)
+    assertEqual(hasPos(rs, 2, 1), true)
+    assertEqual(hasPos(rs, 0, 1), true)
+    assertEqual(hasPos(rs, 1, 2), true)
+    assertEqual(hasPos(rs, 1, 0), true)
+  }
+
+  test("withGroundMovement respects map bounds and walls for Foot") {
+    val ts =
+      tiles3x3(
+        TileFloor(), TileWall(),  TileFloor(),
+        TileFloor(), TileFloor(), TileFloor(),
+        TileFloor(), TileFloor(), TileFloor()
+      )
+    val u = mkUnitAt(0, 0, 1, Soldier(), "A") // 1 move
+    val m = mkMap3(ts, Cons(u, Nil()))
+
+    val reach = withGroundMovement(m, u)
+
+    // (1,0) is a wall -> should NOT be reachable for Foot
+    assertEqual(hasPos(reach, 1, 0), false)
+
+    // (0,1) is floor -> should be reachable
+    assertEqual(hasPos(reach, 0, 1), true)
+
+    // out of bounds never reachable
+    assertEqual(hasPos(reach, -1, 0), false)
+    assertEqual(hasPos(reach, 0, -1), false)
+  }
+
+  test("manhattan distance is |dx| + |dy|") {
+    assertEqual(manhattan(0,0,0,0), 0)
+    assertEqual(manhattan(0,0,2,3), 5)
+    assertEqual(manhattan(2,3,0,0), 5)
+    assertEqual(manhattan(-1,-2,2,2), 7)
+  }
+}

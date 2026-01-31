@@ -1,0 +1,157 @@
+import test
+import src/tests/testutils
+import src/weaponhandling
+import src/model
+
+
+def weaponhandlingTests() = {
+
+  test("switchWeapon: player can switch within bounds") {
+    val w1 = mkWeaponWeaponHandling("W1", 3)
+    val w2 = mkWeaponWeaponHandling("W2", 7)
+    val u  = mkUnitWithWeapons("player", 0, 0, 0, false, "A", list2(w1, w2))
+
+    val u2 = switchWeapon(u, 1)
+
+    assertEqInt(activeWeaponIndex(u2), 1,"index changed")
+    assertEqStr(u2.symbol, "A","correct unit")
+  }
+
+  test("switchWeapon: out of bounds does nothing") {
+    val w1 = mkWeaponWeaponHandling("W1", 3)
+    val u  = mkUnitWithWeapons("player", 0, 0, 0, false, "A", list1(w1))
+
+    val u2 = switchWeapon(u, 5)
+    assertEqInt(activeWeaponIndex(u2), 0,"weapon did nothing")
+  }
+
+  test("switchWeapon: negative index does nothing") {
+    val w1 = mkWeaponWeaponHandling("W1", 3)
+    val w2 = mkWeaponWeaponHandling("W2", 3)
+    val u  = mkUnitWithWeapons("player", 0, 0, 0, false, "A", list2(w1, w2))
+
+    val u2 = switchWeapon(u, -1)
+    assertEqInt(activeWeaponIndex(u2), 0,"negtive index did nothing")
+  }
+
+  test("switchWeapon: enemy cannot switch") {
+    val w1 = mkWeaponWeaponHandling("W1", 3)
+    val w2 = mkWeaponWeaponHandling("W2", 3)
+    val u  = mkUnitWithWeapons("enemy", 0, 0, 0, false, "E", list2(w1, w2))
+
+    val u2 = switchWeapon(u, 1)
+    assertEqInt(activeWeaponIndex(u2), 0,"enemy coudnt switch")
+  }
+
+  test("getWeaponAt returns Some at valid index") {
+    val w1 = mkWeaponWeaponHandling("W1", 1)
+    val w2 = mkWeaponWeaponHandling("W2", 1)
+
+    val w = assertSomeWeapon(getWeaponAt(list2(w1, w2), 1),"retruned valid index")
+    assertEqStr(w.name, "W2","retruned valid index")
+  }
+
+  test("getWeaponAt returns None for out of range") {
+    val w1 = mkWeaponWeaponHandling("W1", 1)
+    assertNoneWeapon(getWeaponAt(list1(w1), 9),"returned none")
+  }
+
+  test("activeWeapon returns weapon at unit.activeWeapon") {
+    val w1 = mkWeaponWeaponHandling("W1", 1)
+    val w2 = mkWeaponWeaponHandling("W2", 1)
+    val u  = mkUnitWithWeapons("player", 0, 0, 1, false, "A", list2(w1, w2))
+
+    val w = assertSomeWeapon(activeWeapon(u),"returned the corret weapon")
+    assertEqStr(w.name, "W2","returned the corret weapon")
+  }
+
+  test("getActiveWeapon matches activeWeapon") {
+    val w1 = mkWeaponWeaponHandling("W1", 1)
+    val w2 = mkWeaponWeaponHandling("W2", 1)
+    val u  = mkUnitWithWeapons("player", 0, 0, 0, false, "A", list2(w1, w2))
+
+    val a1 = weaponhandling::activeWeapon(u)
+    val a2 = getActiveWeapon(u)
+
+    (a1, a2) match {
+  case (Some(wA), Some(wB)) =>
+    assertEqStr(wA.name, wB.name, "matched the correct weapon")
+
+  case (None(), None()) =>
+    ()
+
+  case _ =>
+    assertTrue(false, "one unit had an active weapon but the other didn't")
+}
+  }
+
+  test("setWeaponAt replaces exactly at index") {
+    val w1 = mkWeaponWeaponHandling("W1", 1)
+    val w2 = mkWeaponWeaponHandling("W2", 2)
+    val w3 = mkWeaponWeaponHandling("W3", 3)
+
+    val ws = list3(w1, w2, w3)
+    val nw = mkWeaponWeaponHandling("NEW", 9)
+
+    val ws2 = setWeaponAt(ws, 1, nw)
+
+    val a = assertSomeWeapon(getWeaponAt(ws2, 0),"replaced corretly")
+    val b = assertSomeWeapon(getWeaponAt(ws2, 1), "replaced corretly")
+    val c = assertSomeWeapon(getWeaponAt(ws2, 2), "replaced corretly")
+
+    assertEqStr(a.name, "W1","replaced corretly")
+    assertEqStr(b.name, "NEW","replaced corretly")
+    assertEqStr(c.name, "W3","replaced corretly")
+  }
+
+  test("decWeaponUse decrements uses of active weapon only") {
+    val w1 = mkWeaponWeaponHandling("W1", 5)
+    val w2 = mkWeaponWeaponHandling("W2", 2)
+    val u  = mkUnitWithWeapons("player", 0, 0, 1, false, "A", list2(w1, w2))
+
+    val u2 = decWeaponUse(u)
+
+    val a = assertSomeWeapon(getWeaponAt(u2.weapons, 0), "decrmented correctly")
+    val b = assertSomeWeapon(getWeaponAt(u2.weapons, 1), "decrmented correctly")
+
+    assertEqInt(a.uses, 5,"decrmented correctly")
+    assertEqInt(b.uses, 1,"decrmented correctly")
+  }
+
+  test("decWeaponUse clamps at 0") {
+    val w1 = mkWeaponWeaponHandling("W1", 0)
+    val u  = mkUnitWithWeapons("player", 0, 0, 0, false, "A", list1(w1))
+
+    val u2 = decWeaponUse(u)
+    val w = assertSomeWeapon(activeWeapon(u2),"clamped at zero")
+    assertEqInt(w.uses, 0,"clamped at zero")
+  }
+
+  test("decWeaponUse does nothing when no active weapon") {
+    val u  = mkUnitWithWeapons("player", 0, 0, 0, false, "A", Nil())
+    val u2 = decWeaponUse(u)
+
+    // no isEmpty() assumption: pattern match
+    u2.weapons match {
+      case Nil() => ()
+      case _     => test::assertEqual(true, false)
+    }
+    assertEqInt(u2.activeWeapon, 0,"did nothing")
+  }
+
+  test("parseWeaponIndex returns Some for digits") {
+    val n = assertSomeInt(parseWeaponIndex("12"),"retruned some")
+    assertEqInt(n, 12,"retruned some")
+  }
+
+  test("parseWeaponIndex returns None for non-number") {
+    assertNoneInt(parseWeaponIndex("x"), "retuned none")
+  }
+
+  test("absInt returns absolute value") {
+    assertEqInt(absInt(5), 5,"returned absoulute vlaue")
+    assertEqInt(absInt(-7), 7,"returned absoulute vlaue")
+    assertEqInt(absInt(0), 0,"returned absoulute vlaue")
+  }
+
+}

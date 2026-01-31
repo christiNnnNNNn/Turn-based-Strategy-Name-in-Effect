@@ -66,7 +66,7 @@ def parseMap(text: String): GameMap / { ParseError } = {
     case Cons(t, _) => t
     case Nil()      => "EMPTY"
   }
-  
+
   val tagStack = ref[List[String]](Nil())
   val failed   = ref(false)
   val fallback = GameMap(0, 0, Nil(), Nil())
@@ -283,10 +283,9 @@ def parseMap(text: String): GameMap / { ParseError } = {
       else if (readingUnits.get()) {
         
         if (trimmed == "<unit>") {
-          printString("[DBG] SAW UNIT OPEN LINE: " ++ trimmed ++ "\n")
-          printString("[DBG] <unit> open, top before = " ++ dbgTop(tagStack.get()) ++ "\n")
+          
           openTag(tagStack, "unit")
-          printString("[DBG] <unit> open, top after  = " ++ dbgTop(tagStack.get()) ++ "\n")
+
 
           curSide.set("player")
           curX.set(0); curY.set(0)
@@ -304,10 +303,8 @@ def parseMap(text: String): GameMap / { ParseError } = {
           curMods.set(Nil())
         }
        else if (trimmed == "</unit>") {
-          printString("[DBG] </unit> close, top before = " ++ dbgTop(tagStack.get()) ++ "\n")
+          
           closeTag(tagStack, "unit")
-          printString("[DBG] </unit> close, top after  = " ++ dbgTop(tagStack.get()) ++ "\n")
-
           val fx = curX.get() - 1
           val fy = curY.get() - 1
 

@@ -1,0 +1,500 @@
+import test
+import src/movement
+import src/model
+import src/combat
+import src/maploader
+import src/utils
+import src/gamestate
+import src/renderer
+import string
+
+def row3[A](a: A, b: A, c: A): List[A] =
+  Cons(a, Cons(b, Cons(c, Nil())))
+record ParseResult(map: GameMap, err: Option[String])
+
+def parseMapCapture(text: String): ParseResult / {} =
+  val errRef: Ref[Option[String]] = ref(None())
+
+  val m =
+    try { parseMap(text) }
+    with ParseError { msg =>
+
+      errRef.get() match {
+        case None() => errRef.set(Some(msg))
+        case Some(_) => ()
+      }
+      resume(()) 
+    }
+
+  ParseResult(m, errRef.get())
+
+def mkWeapon0(): Weapon =
+  Weapon("W", Sword(), Physical(), 1, 2, 3, 4, (1,1), Nil())
+
+def mkUnit0(): gameUnbit =
+  gameUnbit(
+    "player", 1, 2,
+    10,
+    3, 4, 5, 6,
+    7, 8, 9,
+    5,
+    Cons(mkWeapon0(), Nil()), 0,
+    false,
+    "A",
+    Soldier()
+  )
+
+def mkUWithWeapons(
+  side: String, x: Int, y: Int,
+  hp: Int,
+  str: Int, defn: Int,
+  mov: Int,
+  cls: UnitClass,
+  sym: String,
+  weapons: List[Weapon],
+  active: Int
+): gameUnbit =
+  gameUnbit(
+    side, x, y,
+    hp,
+    str, 0, defn, 0, 
+    0, 0, 0,            
+    mov,
+    weapons, active,
+    false,
+    sym,
+    cls
+  )
+def tp(x: Int, y: Int): TilePos = TilePos(x, y)
+
+def parseInputPure(
+  line: String,
+  combatState: Option[CombatState],
+  moveState: Option[MoveState],
+  units: List[gameUnbit]
+): UIAction =
+  val trimmed = line.trim()
+
+  combatState match {
+
+
+    case Some(_) =>
+      if (trimmed == "f") ConfirmCombat()
+      else if (trimmed == "g") CancelCombat()
+      else CancelCombat()
+
+    case None() =>
+      if (trimmed == "q") Quit()
+      else if (trimmed == "m") ShowMovement()
+      else if (trimmed == "w") MoveCursor(0, -1)
+      else if (trimmed == "s") MoveCursor(0, 1)
+      else if (trimmed == "a") MoveCursor(-1, 0)
+      else if (trimmed == "d") MoveCursor(1, 0)
+      else if (trimmed == "r") ConfirmMove()
+      else if (trimmed == "t") ListTargets()
+      else if (trimmed == "h") Help()
+      else if (trimmed == "x") EndTurn()
+      else if (trimmed == "c") CancelMove()
+      else {
+        val toks = dropEmpty(split(trimmed, " "))
+        toks match {
+
+
+          case Cons("s", Cons(sym, Nil())) =>
+            unitBySymbol(units, sym) match {
+              case Some(u) => SelectUnit(u.x, u.y)
+              case None()  => ShowMovement()
+            }
+
+          case Cons(n, Nil()) =>
+            parseIntOpt(n) match {
+              case Some(i) => SwitchWeapon(i - 1)
+              case None()  => ShowMovement()
+            }
+
+          case _ =>
+            ShowMovement()
+        }
+      }
+  }
+
+def mkUnitAtRender(
+  side: String,
+  x: Int,
+  y: Int,
+  moved: Bool,
+  cls: UnitClass,
+  sym: String
+): gameUnbit =
+  gameUnbit(
+    side,
+    x, y,
+    10,         
+    0, 0,      
+    0, 0,        
+    0, 0, 0,     
+    5,         
+    Nil(),      
+    0,           
+    moved,
+    sym,
+    cls
+  )
+
+def mkUnitAt(x: Int, y: Int, mov: Int, cls: UnitClass, sym: String): gameUnbit =
+  gameUnbit(
+    "player", x, y,
+    10,
+    0, 0, 0, 0,
+    0, 0, 0,
+    mov,
+    Nil(), 0,
+    false,
+    sym,
+    cls
+  )
+
+def hasPos(xs: List[TilePos], x: Int, y: Int): Bool =
+  xs match {
+    case Nil() => false
+    case Cons(TilePos(px, py), rest) =>
+      if (px == x && py == y) true else hasPos(rest, x, y)
+  }
+
+def count(xs: List[TilePos]): Int =
+  xs match {
+    case Nil() => 0
+    case Cons(_, rest) => 1 + count(rest)
+  }
+def tiles3x3(t00: Tile, t01: Tile, t02: Tile,
+             t10: Tile, t11: Tile, t12: Tile,
+             t20: Tile, t21: Tile, t22: Tile): List[List[Tile]] =
+  Cons(row3(t00, t01, t02),
+  Cons(row3(t10, t11, t12),
+  Cons(row3(t20, t21, t22),
+       Nil())))
+
+def mkMap3(ts: List[List[Tile]], units: List[gameUnbit]): GameMap =
+  GameMap(3, 3, ts, units)
+
+def tiles3x3undefined(center: Tile): List[List[Tile]] =
+  Cons(row3(TileFloor(), TileFloor(), TileFloor()),
+  Cons(row3(TileFloor(), center,     TileFloor()),
+  Cons(row3(TileFloor(), TileFloor(), TileFloor()),
+       Nil())))
+
+def mkMap(units: List[gameUnbit]): GameMap =
+  GameMap(3, 3, tiles3x3undefined(TileFloor()), units)
+
+
+def mkMapWithDefTile(defTile: Tile): GameMap =
+  val ts =
+    tiles3x3(
+      TileFloor(), TileFloor(), TileFloor(),
+      TileFloor(), defTile,    TileFloor(),
+      TileFloor(), TileFloor(), TileFloor()
+    )
+  GameMap(3, 3, ts, Nil())
+
+def mkWeaponRange(rmin: Int, rmax: Int): Weapon =
+  Weapon("W", Sword(), Physical(), 0, 0, 1, 0, (rmin, rmax), Nil())
+
+
+def cellAt(buf: Buffer, x: Int, y: Int): Cell = getCell(buf, x, y)
+
+def list1[A](a: A): List[A] = Cons(a, Nil())
+def list2[A](a: A, b: A): List[A] = Cons(a, Cons(b, Nil()))
+def list3[A](a: A, b: A, c: A): List[A] = Cons(a, Cons(b, Cons(c, Nil())))
+
+def mkWeaponWeaponHandling(name: String, uses: Int): Weapon =
+  Weapon(name, Sword(), Physical(), 1, 50, uses, 0, (1,1), Nil())
+
+def mkUnitWithWeapons(
+  side: String,
+  x: Int, y: Int,
+  active: Int,
+  moved: Bool,
+  sym: String,
+  ws: List[Weapon]
+): gameUnbit =
+  gameUnbit(
+    side, x, y,
+    10,
+    0, 0, 0, 0,
+    0, 0, 0,
+    5,
+    ws,
+    active,
+    moved,
+    sym,
+    Soldier()
+  )
+
+def mkUnitAtUtils(
+  side: String, x: Int, y: Int,
+  moved: Bool, cls: UnitClass, sym: String
+): gameUnbit =
+  gameUnbit(
+    side, x, y,
+    10,         
+    0, 0,      
+    0, 0,      
+    0, 0, 0,   
+    5,         
+    Nil(), 0,   
+    moved,
+    sym,
+    cls
+  )
+
+def assertCell(
+  buf: Buffer,
+  x: Int, y: Int,
+  ch: String,
+  fg: String,
+  bg: String
+): Unit / { Assertion } = {
+  val c = getCell(buf, x, y)
+  assertEqual(c.char, ch, "cell.char mismatch")
+  assertEqual(c.fg,   fg, "cell.fg mismatch")
+  assertEqual(c.bg,   bg, "cell.bg mismatch")
+}
+
+def containsTileDraw(
+  ds: List[(Int,Int,String,String)],
+  x: Int, y: Int,
+  fill: String
+): Bool =
+  ds match {
+    case Nil() => false
+    case Cons((dx,dy,dfill,_), rest) =>
+      if (dx == x && dy == y && dfill == fill) true
+      else containsTileDraw(rest, x, y, fill)
+  }
+
+def containsUnitDraw(
+  ds: List[(Int,Int,String,String)],
+  x: Int, y: Int,
+  ch: String,
+  color: String
+): Bool =
+  ds match {
+    case Nil() => false
+    case Cons((dx,dy,dch,dcol), rest) =>
+      if (dx == x && dy == y && dch == ch && dcol == color) true
+      else containsUnitDraw(rest, x, y, ch, color)
+  }
+
+def containsHighlight(
+  ds: List[(Int,Int,String)],
+  x: Int, y: Int,
+  col: String
+): Bool =
+  ds match {
+    case Nil() => false
+    case Cons((dx,dy,dc), rest) =>
+      if (dx == x && dy == y && dc == col) true
+      else containsHighlight(rest, x, y, col)
+  }
+
+  
+def mkUnit(
+  side: String,
+  x: Int, y: Int,
+  hp: Int,
+  str: Int, mag: Int,
+  defn: Int, res: Int,
+  pre: Int, agi: Int, luck: Int,
+  mov: Int,
+  cls: UnitClass,
+  sym: String
+): gameUnbit =
+  gameUnbit(
+    side, x, y,
+    hp,
+    str, mag, defn, res,
+    pre, agi, luck,
+    mov,
+    Nil(), 0,
+    false,
+    sym,
+    cls
+  )
+
+def mkUQuick(
+  side: String, x: Int, y: Int,
+  hp: Int,
+  moved: Bool,
+  cls: UnitClass,
+  sym: String
+): gameUnbit =
+  gameUnbit(
+    side, x, y,
+    hp,
+    0, 0, 0, 0,       
+    0, 0, 0,          
+    5,               
+    Nil(), 0,         
+    moved,
+    sym,
+    cls
+  )
+
+def mkUnitQuick(side: String, x: Int, y: Int, sym: String): gameUnbit =
+  gameUnbit(
+    side, x, y,
+    10,
+    0, 0, 0, 0,
+    0, 0, 0,
+    5,
+    Nil(), 0,
+    false,
+    sym,
+    Soldier()
+  )
+
+def mkWeapon(
+  name: String,
+  kind: WeaponKind,
+  dmgT: DamageType,
+  atk: Int,
+  hit: Int,
+  uses: Int,
+  crit: Int,
+  rmin: Int,
+  rmax: Int,
+  mods: List[WeaponMod]
+): Weapon =
+  Weapon(name, kind, dmgT, atk, hit, uses, crit, (rmin, rmax), mods)
+
+def mods1(m: WeaponMod): List[WeaponMod] = Cons(m, Nil())
+def mods2(a: WeaponMod, b: WeaponMod): List[WeaponMod] = Cons(a, Cons(b, Nil()))
+def mods3(a: WeaponMod, b: WeaponMod, c: WeaponMod): List[WeaponMod] = Cons(a, Cons(b, Cons(c, Nil())))
+
+
+def resolveAttackDet(att: gameUnbit, defU: gameUnbit, p: CombatPreview, h: Int, c: Int): AttackResult / {} =
+  try { resolveAttack(att, defU, p) }
+  with roll { _ =>
+    val k = box ref
+    
+    resume(0)
+  }
+
+def resolveAttackDet2(att: gameUnbit, defU: gameUnbit, p: CombatPreview, h: Int, c: Int): AttackResult / {} = {
+  val whichRef: Ref[Int] = ref(0)
+
+    try { resolveAttack(att, defU, p) }
+    with roll { _ =>
+      val w = whichRef.get()
+      whichRef.set(w + 1)
+      if (w == 0) resume(h) else resume(c)
+    }
+}
+
+def assertEqInt(a: Int, b: Int,msg: String): Unit / { test::Assertion } =
+{
+   test::assertEqual(a, b, msg)
+}
+
+def assertEqBool(a: Bool, b: Bool,msg: String): Unit / { test::Assertion } ={
+  test::assertEqual(a, b,msg)
+}
+def assertEqStr(a: String, b: String,msg:String): Unit / { test::Assertion } ={
+  test::assertEqual(a, b,msg)
+}
+def assertSomeWeapon(opt: Option[Weapon],msg:String): Weapon / { test::Assertion } ={
+  opt match {
+    case Some(w) => w
+    case None()  =>
+      test::assertEqual(true, false,msg)
+      Weapon("?", Sword(), Physical(), 0, 0, 0, 0, (1,1), Nil())
+  }
+}
+def assertNoneWeapon(opt: Option[Weapon], msg: String): Unit / { test::Assertion } ={
+  opt match {
+    case None() => ()
+    case Some(_) => test::assertEqual(true, false,msg)
+  }
+}
+def assertSomeInt(opt: Option[Int], msg: String): Int / { test::Assertion } ={
+  opt match {
+    case Some(n) => n
+    case None()  =>
+      test::assertEqual(true, false,msg)
+      0
+  }
+}
+def assertNoneInt(opt: Option[Int], msg: String): Unit / { test::Assertion } =
+{
+  opt match {
+    case None() => ()
+    case Some(_) => test::assertEqual(true, false,msg)
+  }
+  }
+
+def activeWeaponIndex(u: gameUnbit): Int =
+  u match {
+    case gameUnbit(
+      _, _, _,
+      _,
+      _, _, _, _,
+      _, _, _,
+      _,
+      _,
+      aw,        
+      _,
+      _, _
+    ) => aw
+  }
+
+effect UIReadLine(): String
+effect UIWrite(s: String): Unit
+
+def withRealUI[R] { prog: () => R / { UIReadLine, UIWrite } } : R =
+  try { prog() }
+  with UIReadLine { () =>
+    val c = newConsole()
+    val line = readLine(c)
+    closeConsole(c)
+    resume(line)
+  }
+  with UIWrite { s =>
+    printString(s)
+    resume(())
+  }
+
+  def contains(hay: String, needle: String): Bool =
+  hay.indexOf(needle) match {
+    case Some(_) => true
+    case None()  => false
+  }
+
+def assertContains(hay: String, needle: String, msg: String): Unit / { test::Assertion } =
+  assertEqBool(contains(hay, needle), true, msg)
+
+
+def row2[A](a: A, b: A): List[A] = Cons(a, Cons(b, Nil()))
+def tiles2x2(): List[List[Tile]] =
+  Cons(row2(TileFloor(), TileFloor()),
+  Cons(row2(TileFloor(), TileFloor()),
+       Nil()))
+
+def mkWeaponSimple(name: String): Weapon =
+  Weapon(name, Sword(), Physical(), 1, 50, 10, 0, (1,1), Nil())
+
+def mkUnitAt(side: String, x: Int, y: Int, moved: Bool, cls: UnitClass, sym: String): gameUnbit =
+  gameUnbit(
+    side, x, y,
+    10,
+    1, 0, 0, 0,
+    0, 0, 0,
+    3,
+    Cons(mkWeaponSimple("W1"), Cons(mkWeaponSimple("W2"), Nil())),
+    0,
+    moved,
+    sym,
+    cls
+  )
+
+def mkMap2(units: List[gameUnbit]): GameMap =
+  GameMap(2, 2, tiles2x2(), units)
