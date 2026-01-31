@@ -10,7 +10,7 @@ import src/utils
 import src/gamestate
 
 def main() = {
-  val text = readFile("C:/Users/Christian/Documents/errormap.txt")
+  val text = readFile("C:/Users/Christian/Documents/testMap.txt")
   val map =
   try { parseMap(text) }
   with ParseError { (msg) =>
@@ -22,12 +22,13 @@ def main() = {
     printString("please try another map\n")
     
   case _ =>
+    printHelp()
     val selected: Option[gameUnbit] = None()
-      val reachable: List[TilePos] = Nil()
-      var moveState: Option[MoveState] = None()
-      var combatState: Option[CombatState] = None()
-      with console;
-      runMenu(map, selected, reachable,moveState,combatState)
+    val reachable: List[TilePos] = Nil()
+    var moveState: Option[MoveState] = None()
+    var combatState: Option[CombatState] = None()
+    with console;
+    runMenu(map, selected, reachable,moveState,combatState)
 }
  
 }

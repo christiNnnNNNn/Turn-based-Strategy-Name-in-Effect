@@ -54,12 +54,13 @@ def sumMountedBonus(mods: List[WeaponMod]): Int =
         case _               => sumMountedBonus(rest)
       }
   }
-  def terrainDmgDelta(map: GameMap, defU: gameUnbit): Int =
+  
+def terrainDmgDelta(map: GameMap, defU: gameUnbit): Int =
   tileAt(map, defU.x, defU.y) match {
     case TileForest() => -1
     case TileHills()  => -1
     case _            => 0
-  }
+ }
 
 def terrainHitDelta(map: GameMap, defU: gameUnbit): Int =
   tileAt(map, defU.x, defU.y) match {

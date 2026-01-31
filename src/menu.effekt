@@ -44,13 +44,9 @@ def runMenu(
       else if (trimmed == "d") MoveCursor(1, 0)
       else if (trimmed == "r") ConfirmMove()
       else if (trimmed == "t") ListTargets()
-
-    
+      else if (trimmed == "h") Help()
       else if (trimmed == "x") EndTurn()
-
-      
       else if (trimmed == "c") CancelMove()
-
       else {
         val toks = dropEmpty(split(trimmed, " "))
 
@@ -104,25 +100,14 @@ def runMenu(
   val c = newConsole()
   val line = readLine(c)
   closeConsole(c)
-  dbg("readLine returned: '" ++ line ++ "'")
-  dbg("dispatch action")
   val action = parseInput(line,combatState, moveState)
   action match {
     case Quit() =>
       printString("Bye!\n")
       ()
     case SelectUnit(x, y) =>
-      dbg("SelectUnit(" ++ x.show ++ "," ++ y.show ++ ")")
 
       val selOpt = unitAt(map.units, x, y)
-
-      dbg(
-        "SelectUnit result: " ++
-        (selOpt match {
-          case Some(_) => "Some(unit)"
-          case None()  => "None"
-        })
-      )
       val newSelected =
       selOpt match {
         case Some(u) =>
@@ -173,38 +158,20 @@ def runMenu(
           printString(
           "[DBG] Commit cursor at (" ++ cx.show ++ "," ++ cy.show ++ ")\n"
         )
-          val moved =
-            gameUnbit(
-              u.side,
-              cx, cy,
-              u.hp,
-              u.strength,
-              u.magic,
-              u.defense,
-              u.resistance,
-              u.precision,
-              u.agility,
-              u.luck,
-              u.movement,
-              u.weapons,
-              u.activeWeapon,
-              true,
-              u.symbol,
-              u.class
-            )
-          printString(
-    "[DBG] New unit position = (" ++ moved.x.show ++ "," ++ moved.y.show ++ ")\n"
-  )
+          val moved = setPosMoved(u, cx, cy, true)
+                  printString(
+            "[DBG] New unit position = (" ++ moved.x.show ++ "," ++ moved.y.show ++ ")\n"
+          )
           val newUnits =
           replaceUnit(map.units, sx, sy, moved)
 
         val newMap =
           GameMap(map.width, map.height, map.tiles, newUnits)
           map.units.foreach { u =>
-    printString(
-      "[DBG] render unit at (" ++ u.x.show ++ "," ++ u.y.show ++ ")\n"
-    )
-  }
+          printString(
+            "[DBG] render unit at (" ++ u.x.show ++ "," ++ u.y.show ++ ")\n"
+          )
+        }
 
         runMenu(newMap, Some(moved), Nil(), None(), None())
 
@@ -308,25 +275,8 @@ def runMenu(
                               case None() => (att.x, att.y)
                             }
 
-                          
-                          val attAtCursor =
-                            gameUnbit(
-                              att.side,
-                              ax, ay,
-                              att.hp,
-                              att.strength, att.magic, att.defense, att.resistance,
-                              att.precision, att.agility, att.luck,
-                              att.movement,
-                              att.weapons,
-                              att.activeWeapon,
-                              att.moved,
-                              att.symbol,
-                              att.class
-                            )
-
+                          val attAtCursor = setPos(att, ax, ay)
                           val p = previewPure(map, attAtCursor, target, wAtt, wDef)
-
-
                           val cs =
                             CombatState(attAtCursor, sx, sy, ax, ay, target, wAtt, wDef, p)
 
@@ -338,7 +288,6 @@ def runMenu(
                           runMenu(map, selected, reachable, moveState, combatState)
                       }
 
-                      
                     case None() =>
                       printString("Invalid target.\n")
                       runMenu(map, selected, reachable, moveState, None())
@@ -371,20 +320,7 @@ case ConfirmCombat() =>
       case Some(cs) =>
         
         val att0 = decWeaponUse(cs.attacker)
-        val att0AtCursor =
-          gameUnbit(
-            att0.side,
-            cs.attackerX, cs.attackerY,
-            att0.hp,
-            att0.strength, att0.magic, att0.defense, att0.resistance,
-            att0.precision, att0.agility, att0.luck,
-            att0.movement,
-            att0.weapons,
-            att0.activeWeapon,
-            true,
-            att0.symbol,
-            att0.class
-          )
+        val att0AtCursor = setPosMoved(att0, cs.attackerX, cs.attackerY, true)
         val def0 = cs.defender
 
         weaponhandling::activeWeapon(att0) match {
@@ -463,18 +399,21 @@ case ConfirmCombat() =>
   val r: Int = randInt(m)   
   resume(r)
 }
-case EndTurn() =>
-  printString("\n--- Enemy Phase ---\n")
+    case Help() =>
+      printHelp()
+      runMenu(map, selected, reachable, moveState, combatState)
+    case EndTurn() =>
+      printString("\n--- Enemy Phase ---\n")
 
-  val afterEnemy = enemyPhase(map)
+      val afterEnemy = enemyPhase(map)
 
-  endOrContinue(afterEnemy) { mAlive =>
-    // start of new player turn: reset player moved flags
-    val resetUnits = resetMoved(mAlive.units)
-    val nextMap = GameMap(mAlive.width, mAlive.height, mAlive.tiles, resetUnits)
+      endOrContinue(afterEnemy) { mAlive =>
+        // start of new player turn: reset player moved flags
+        val resetUnits = resetMoved(mAlive.units)
+        val nextMap = GameMap(mAlive.width, mAlive.height, mAlive.tiles, resetUnits)
 
-    printString("\n--- Player Turn ---\n")
-    runMenu(nextMap, None(), Nil(), None(), None())
+        printString("\n--- Player Turn ---\n")
+        runMenu(nextMap, None(), Nil(), None(), None())
   }
   }
 }

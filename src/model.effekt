@@ -93,7 +93,6 @@ type WeaponMod {
   AntiArmor(amount: Int)      // +damage vs Armor
 }
 
-
 // --- Weapon record
 record Weapon(
   name: String,
@@ -106,3 +105,58 @@ record Weapon(
   range:(Int,Int),
   mods: List[WeaponMod]
 )
+
+def setPos(u: gameUnbit, x: Int, y: Int): gameUnbit =
+  gameUnbit(
+    u.side, x, y,
+    u.hp,
+    u.strength, u.magic, u.defense, u.resistance,
+    u.precision, u.agility, u.luck,
+    u.movement,
+    u.weapons, u.activeWeapon,
+    u.moved,
+    u.symbol,
+    u.class
+  )
+
+def setHp(u: gameUnbit, hp: Int): gameUnbit =
+  gameUnbit(
+    u.side, u.x, u.y,
+    hp,
+    u.strength, u.magic, u.defense, u.resistance,
+    u.precision, u.agility, u.luck,
+    u.movement,
+    u.weapons, u.activeWeapon,
+    u.moved,
+    u.symbol,
+    u.class
+  )
+
+def setMoved(u: gameUnbit, moved: Bool): gameUnbit =
+  gameUnbit(
+    u.side, u.x, u.y,
+    u.hp,
+    u.strength, u.magic, u.defense, u.resistance,
+    u.precision, u.agility, u.luck,
+    u.movement,
+    u.weapons, u.activeWeapon,
+    moved,
+    u.symbol,
+    u.class
+  )
+
+def setWeapons(u: gameUnbit, weapons: List[Weapon], activeWeapon: Int): gameUnbit =
+  gameUnbit(
+    u.side, u.x, u.y,
+    u.hp,
+    u.strength, u.magic, u.defense, u.resistance,
+    u.precision, u.agility, u.luck,
+    u.movement,
+    weapons, activeWeapon,
+    u.moved,
+    u.symbol,
+    u.class
+  )
+
+  def setPosMoved(u: gameUnbit, x: Int, y: Int, moved: Bool): gameUnbit =
+    setMoved(setPos(u, x, y), moved)

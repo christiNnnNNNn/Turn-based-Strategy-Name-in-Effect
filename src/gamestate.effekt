@@ -16,7 +16,8 @@ type UIAction {
   ListTargets()       
   ConfirmCombat()     
   CancelCombat() 
-  EndTurn()     
+  EndTurn()
+  Help()     
   }
 
 record CombatState(
@@ -63,20 +64,8 @@ def resetMoved(units: List[gameUnbit]): List[gameUnbit] =
     case Nil() => Nil()
     case Cons(u, rest) =>
       val u2 =
-        if (u.side == "player")
-          gameUnbit(
-            u.side, u.x, u.y,
-            u.hp, u.strength, u.magic, u.defense, u.resistance,
-            u.precision, u.agility, u.luck,
-            u.movement,
-            u.weapons,
-            u.activeWeapon,
-            false,
-            u.symbol,
-            u.class
-          )
-        else
-          u
+        if (u.side == "player") setMoved(u, false)
+        else u
       Cons(u2, resetMoved(rest))
   }
 
@@ -202,15 +191,12 @@ def isPlayer(u: gameUnbit): Bool = u.side == "player"
 
 def isEnemy(u: gameUnbit): Bool = u.side == "enemy"
 
-def isAlive(u: gameUnbit): Bool =
-  u.hp > 0
-
 def removeDead(units: List[gameUnbit]): List[gameUnbit] =
   units match {
     case Nil() => Nil()
     case Cons(u, rest) =>
       val tail = removeDead(rest)
-      if (isAlive(u)) Cons(u, tail) else tail
+      if (alive(u)) Cons(u, tail) else tail
   }
 
 def cleanupMap(m: GameMap): GameMap =
@@ -220,7 +206,7 @@ def sideHasUnits(units: List[gameUnbit], side: String): Bool =
   units match {
     case Nil() => false
     case Cons(u, rest) =>
-      if (u.side == side && isAlive(u)) true
+      if (u.side == side && alive(u)) true
       else sideHasUnits(rest, side)
   }
 
@@ -259,17 +245,7 @@ def sideHasUnits(units: List[gameUnbit], side: String): Bool =
           val e1 =
             destOpt match {
               case None() => e0
-              case Some(TilePos(nx, ny)) =>
-                gameUnbit(
-                  e0.side, nx, ny,
-                  e0.hp, e0.strength, e0.magic, e0.defense, e0.resistance,
-                  e0.precision, e0.agility, e0.luck,
-                  e0.movement,
-                  e0.weapons, e0.activeWeapon,
-                  e0.moved,
-                  e0.symbol,
-                  e0.class
-                )
+              case Some(TilePos(nx, ny)) => setPos(e0, nx, ny)
             }
 
           // commit movement

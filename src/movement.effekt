@@ -116,6 +116,7 @@ def neighbors(r: Reach): List[Reach] =
   Cons(Reach(r.x, r.y + 1, r.remaining),
   Cons(Reach(r.x, r.y - 1, r.remaining),
        Nil()))))
+
 def expand(
   frontier: List[Reach],
   seen: List[(TilePos, Int)],

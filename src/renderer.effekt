@@ -6,7 +6,7 @@ import src/gamestate
 import src/combat
 import src/utils
 
-def dbg(s: String): Unit = printString("[DBG] " ++ s ++ "\n")
+
 def ansiGray(s: String): String = "\u001b[90m" ++ s ++ "\u001b[0m"
 def ansiBold(): String = "\u001b[1m"
 def ansiUnderline(): String = "\u001b[4m"
@@ -306,6 +306,25 @@ def renderMap(map: GameMap): Unit / { DrawTile } = {
     }
     y = y + 1
   }
+}
+
+def printHelp(): Unit = {
+  printString(
+    "\n=== CONTROLS ===\n" ++
+    "q            Quit\n" ++
+    "s <SYMBOL>    Select unit by symbol (e.g. s A)\n" ++
+    "m            Show movement range / enter move mode\n" ++
+    "w/a/s/d      Move cursor (when in move mode)\n" ++
+    "r            Confirm move (when in move mode)\n" ++
+    "c            Cancel move mode\n" ++
+    "t            List targets in range (attack)\n" ++
+    "1..9         Switch active weapon (by number)\n" ++
+    "x            End turn\n" ++
+    "h            Show this help again\n" ++
+    "\nCombat confirm:\n" ++
+    "f            Confirm combat\n" ++
+    "g            Cancel combat\n"
+  )
 }
 
 def renderUnit(u: gameUnbit, color: String): Unit / { DrawUnit } =

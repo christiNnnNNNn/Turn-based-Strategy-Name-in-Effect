@@ -43,7 +43,7 @@ def switchWeapon(
 
 def parseWeaponIndex(line: String): Option[Int] =
   try {
-    Some(line.toInt1)
+    parseIntOpt(line)
   } with Exception[WrongFormat] {
     def raise(_, _) = None()
   }

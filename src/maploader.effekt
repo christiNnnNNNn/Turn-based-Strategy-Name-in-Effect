@@ -5,6 +5,7 @@ import list
 import src/model
 import src/utils
 import src/movement
+import src/combat
 effect ParseError(msg: String): Unit
 
 
@@ -65,12 +66,7 @@ def parseMap(text: String): GameMap / { ParseError } = {
     case Cons(t, _) => t
     case Nil()      => "EMPTY"
   }
-  def startsWith(s: String, prefix: String): Bool =
-  s.indexOf(prefix) match {
-    case Some(i) => i == 0
-    case None()  => false
-  }
-
+  
   val tagStack = ref[List[String]](Nil())
   val failed   = ref(false)
   val fallback = GameMap(0, 0, Nil(), Nil())
@@ -133,11 +129,6 @@ def parseMap(text: String): GameMap / { ParseError } = {
   def isWall(t: Tile): Bool = t match {
     case TileWall() => true
     case _          => false
-  }
-
-  def isFlyer(c: UnitClass): Bool = c match {
-    case Flyer() => true
-    case _       => false
   }
   
   var height = 0
