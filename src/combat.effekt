@@ -1,12 +1,13 @@
 import src/model
 import src/movement
+
 effect roll(maxExclusive: Int): Int
 effect triangleBonus(attKind: WeaponKind, defKind: WeaponKind): (Int, Int)
 effect modifyDamage(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon, dmg: Int): Int
 effect modifyHit(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon, hit: Int): Int
 effect modifyCrit(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon, crit: Int): Int
-
 effect clamp0(n: Int): Int
+
 extern def randInt(max: Int) at io: Int =
   jsNode "Math.floor(Math.random() * ${max})"
 
@@ -15,6 +16,8 @@ record CombatPreview(
   hit: Int,
   crit: Int
 )
+
+//Caculates the crit modfier form wepaon crit buffs
 def sumExtraCrit(mods: List[WeaponMod]): Int =
   mods match {
     case Nil() => 0
@@ -25,6 +28,7 @@ def sumExtraCrit(mods: List[WeaponMod]): Int =
       }
   }
 
+//applies armorbreak bonus
 def sumArmorBreak(mods: List[WeaponMod]): Int =
   mods match {
     case Nil() => 0
@@ -35,6 +39,7 @@ def sumArmorBreak(mods: List[WeaponMod]): Int =
       }
   }
 
+//applies bonus agisnt Armor Units
 def sumAntiArmor(mods: List[WeaponMod]): Int =
   mods match {
     case Nil() => 0
@@ -45,6 +50,7 @@ def sumAntiArmor(mods: List[WeaponMod]): Int =
       }
   }
 
+//Applies Bonus agianst mounted Units
 def sumMountedBonus(mods: List[WeaponMod]): Int =
   mods match {
     case Nil() => 0
@@ -54,7 +60,8 @@ def sumMountedBonus(mods: List[WeaponMod]): Int =
         case _               => sumMountedBonus(rest)
       }
   }
-  
+
+//applies terrain damge bonuses
 def terrainDmgDelta(map: GameMap, defU: gameUnbit): Int =
   tileAt(map, defU.x, defU.y) match {
     case TileForest() => -1
@@ -62,6 +69,7 @@ def terrainDmgDelta(map: GameMap, defU: gameUnbit): Int =
     case _            => 0
  }
 
+//applies Terrain Hit bonuses
 def terrainHitDelta(map: GameMap, defU: gameUnbit): Int =
   tileAt(map, defU.x, defU.y) match {
     case TileForest() => -15
@@ -81,6 +89,8 @@ def isFlyer(c: UnitClass): Bool =
     case Flyer() => true
     case _       => false
   }
+
+// contrains raw dmage calculations withoutr modifiers for combat preview
 def preview(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon)
   : CombatPreview / { triangleBonus, clamp0, modifyDamage, modifyHit, modifyCrit } =
 {
@@ -114,6 +124,7 @@ def preview(att: gameUnbit, deff: gameUnbit, wAtt: Weapon, wDef: Weapon)
 
 record AttackResult(hit: Bool, crit: Bool, damage: Int)
 
+//handles Attack rng after modifer and hit and dmage rate were calculated
 def resolveAttack(att: gameUnbit, deff: gameUnbit, p: CombatPreview): AttackResult / { roll } =
   val h = do roll(100)
   if (h >= p.hit) AttackResult(false, false, 0)
@@ -138,6 +149,8 @@ def applyDamage(u: gameUnbit, dmg: Int): gameUnbit =
     u.symbol,
     u.class
   )
+
+//aplies bonuses to damge calculation handles dmage effects
 def previewPure(map: GameMap, att: gameUnbit, defU: gameUnbit, wAtt: Weapon, wDef: Weapon): CombatPreview / {} =
   try { preview(att, defU, wAtt, wDef) }
 

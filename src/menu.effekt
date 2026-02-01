@@ -10,6 +10,7 @@ import src/utils
 import src/weaponhandling
 import string
 
+//retruns stes after palyer attack
 def afterPlayerCombat(m: GameMap): Unit =
  
   endOrContinue(m) { mm =>
@@ -24,6 +25,7 @@ def runMenu(
   combatState: Option[CombatState]
 ): Unit = {
 
+//resllves apyler inputs
  def parseInput(line: String, combatState: Option[CombatState], moveState: Option[MoveState]): UIAction = {
   val trimmed = line.trim()
 
@@ -51,7 +53,7 @@ def runMenu(
         val toks = dropEmpty(split(trimmed, " "))
 
         toks match {
-          case Cons("s", Cons(sym, Nil())) =>
+          case Cons("s", Cons(sym, Nil())) =>//select units with their appropraite symbol
             val s = sym.trim()
             if (s.length() == 0) ShowMovement()
             else {
@@ -66,13 +68,13 @@ def runMenu(
               }
   }
 
-
+          //wepaon select
           case Cons(n, Nil()) =>
             parseIntOpt(n) match {
               case Some(i) => SwitchWeapon(i - 1)
               case None()  => ShowMovement()
             }
-
+          //falback
           case _ =>
             ShowMovement()
         }
@@ -83,7 +85,7 @@ def runMenu(
   val buffer = ref(makeBuffer(map.width, map.height))
   
   withConsole(buffer, map, selected, reachable, moveState)
-  selected match {
+  selected match {//inform aplayer according to unit selected
   case Some(u) =>
     printUnitStats(u)
     printWeapons(u)
@@ -111,7 +113,7 @@ def runMenu(
       val newSelected =
       selOpt match {
         case Some(u) =>
-          if (u.side == "player" && u.moved) {
+          if (u.side == "player" && u.moved) {//prevnet moving twice
             printString("That unit already moved this turn.\n")
             None()
           } else Some(u)
@@ -126,7 +128,7 @@ def runMenu(
         None(),
         None()       
       )
-   case MoveCursor(dx, dy) =>
+   case MoveCursor(dx, dy) =>// cased used during movment
     moveState match {
       case Some(Moving(u, sx, sy, cx, cy, rem)) =>
         val nx = cx + dx
@@ -149,9 +151,9 @@ def runMenu(
     }
 
 
-  case CancelMove() =>
+  case CancelMove() =>// cnacel applied movment
     runMenu(map, selected, reachable, None(), None())
-    case ConfirmMove() =>    
+    case ConfirmMove() => // move towards cursor  
     printString("[DBG] ConfirmMove pressed\n")     
       moveState match {
         case Some(Moving(u, sx, sy, cx, cy, _)) =>
@@ -180,7 +182,7 @@ def runMenu(
       }
 
    
-  case ShowMovement() =>
+  case ShowMovement() =>// displays were you can go
       val newReachable =
         selected match {
           case Some(u) =>
@@ -208,22 +210,22 @@ def runMenu(
         None()
       )
     case SwitchWeapon(i) =>
-  selected match {
-    case Some(u) =>
-      val updated = switchWeapon(u, i)
+      selected match {
+        case Some(u) =>
+          val updated = switchWeapon(u, i)
 
-      
-      val newUnits = replaceUnit(map.units, u.x, u.y, updated)
+          
+          val newUnits = replaceUnit(map.units, u.x, u.y, updated)
 
-      val newMap =
-        GameMap(map.width, map.height, map.tiles, newUnits)
+          val newMap =
+            GameMap(map.width, map.height, map.tiles, newUnits)
 
-      runMenu(newMap, Some(updated), reachable, moveState, None())
+          runMenu(newMap, Some(updated), reachable, moveState, None())
 
-    case None() =>
-      runMenu(map, selected, reachable, moveState, None())
-  }
-  case ListTargets() =>
+        case None() =>
+          runMenu(map, selected, reachable, moveState, None())
+      }
+  case ListTargets() =>// lits who you can attack
     selected match {
       case Some(att) =>
       if (att.side != "player") {
@@ -280,7 +282,7 @@ def runMenu(
                           val cs =
                             CombatState(attAtCursor, sx, sy, ax, ay, target, wAtt, wDef, p)
 
-                          printPreview(cs)
+                          printPreview(cs)// gives combat preview
                           runMenu(map, selected, reachable, moveState, Some(cs))
 
                         case None() =>
@@ -311,7 +313,7 @@ def runMenu(
   case CancelCombat() =>
     runMenu(map, selected, reachable, moveState, None())
 
-case ConfirmCombat() =>
+case ConfirmCombat() =>// resolves combat
   try {
     combatState match {
       case None() =>

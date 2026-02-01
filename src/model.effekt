@@ -17,6 +17,7 @@ type UnitClass {
   Flyer()
 }
 
+//momvent type associated with a class
 type MoveMode {
   Foot()
   Heavy()
@@ -39,7 +40,7 @@ record gameUnbit(
   x: Int,              // tile X position
   y: Int,              // tile Y position
 
-  // --- Core stats ---
+  // Core stats 
   hp: Int,             // Hit Points: how much damage the unit can take before dying
 
   strength: Int,       // Physical attack power (used for melee / physical damage)
@@ -54,7 +55,7 @@ record gameUnbit(
 
   movement: Int,       // Movement range per turn
 
-  // --- Weapons ---
+  // Weapons
   weapons: List[Weapon], // All weapons the unit carries
   activeWeapon: Int,      // Index into weapons list (0-based)
 
@@ -69,7 +70,7 @@ record GameMap(
   tiles: List[List[Tile]],
   units: List[gameUnbit]
 )
-// --- Weapon categories (for matchup rules later)
+// Weapon categories (for matchup rules later)
 type WeaponKind {
   Sword()
   Axe()
@@ -78,13 +79,13 @@ type WeaponKind {
   Tome()
 }
 
-// --- Is damage physical or magical?
+// Is damage physical or magical?
 type DamageType {
   Physical()
   Magic()
 }
 
-// --- Special effects that can be attached to weapons
+// Special effects that can be attached to weapons
 type WeaponMod {
   NoneMod()
   ArmorBreak(amount: Int)     // flat defense reduction to defender in preview (and later apply as status)
@@ -93,7 +94,7 @@ type WeaponMod {
   AntiArmor(amount: Int)      // +damage vs Armor
 }
 
-// --- Weapon record
+// Weapon record
 record Weapon(
   name: String,
   kind: WeaponKind,

@@ -60,20 +60,16 @@ def isKnownTag(t: String): Bool =
   t == "modifiers" || t == "/modifiers"
 
 def parseMap(text: String): GameMap / { ParseError } = {
-
-  def dbgTop(stack: List[String]): String =
-  stack match {
-    case Cons(t, _) => t
-    case Nil()      => "EMPTY"
-  }
-
+  //stroes last tag for the error message
   val tagStack = ref[List[String]](Nil())
+  //error flagh
   val failed   = ref(false)
+  //returned on error
   val fallback = GameMap(0, 0, Nil(), Nil())
-
+  
   def openTag(tagStack: Ref[List[String]], name: String): Unit =
     tagStack.set(Cons(name, tagStack.get()))
-
+  // chekcs if the closing tag matches the Tag stack
   def closeTag(tagStack: Ref[List[String]], name: String): Unit =
     tagStack.get() match {
       case Cons(top, rest) =>
@@ -103,13 +99,13 @@ def parseMap(text: String): GameMap / { ParseError } = {
         case (bx, by) => (ax == bx) && (ay == by)
       }
   }
-
+  //gives back a tile psotion
   def posInList(xs: List[(Int,Int)], p: (Int,Int)): Bool = xs match {
     case Nil() => false
     case Cons(h, t) =>
       if (posEq(h, p)) true else posInList(t, p)
   }
-
+  //gives out a row
   def nthRow(rows: List[List[Tile]], y: Int): Option[List[Tile]] = {
     if (y < 0) None()
     else rows match {
@@ -117,7 +113,7 @@ def parseMap(text: String): GameMap / { ParseError } = {
       case Cons(r, rs) => if (y == 0) Some(r) else nthRow(rs, y - 1)
     }
   }
-
+  //gives otu a single tiles form a row
   def nthTile(row: List[Tile], x: Int): Option[Tile] = {
     if (x < 0) None()
     else row match {
@@ -130,11 +126,12 @@ def parseMap(text: String): GameMap / { ParseError } = {
     case TileWall() => true
     case _          => false
   }
-  
+  //mapheight
   var height = 0
   val rows   = ref[List[List[Tile]]](Nil())
   val units  = ref[List[gameUnbit]](Nil())
 
+  //the varibles store unit values that are parsed
   val curSide = ref[String]("")
   val curX    = ref[Int](0)
   val curY    = ref[Int](0)
@@ -152,12 +149,14 @@ def parseMap(text: String): GameMap / { ParseError } = {
   val readingMods = ref(false)
   val curMods     = ref[List[WeaponMod]](Nil())
 
+  //flags for correct tag order
   val readingMap   = ref(false)
   val readingUnits = ref(false)
   val weapons = ref[List[Weapon]](Nil())
   val readingWeapons = ref(false)
   val readingWeapon  = ref(false)
 
+  //varaibles thta store wepaon values
   val wName   = ref[String]("")
   val wType   = ref[WeaponKind](Axe())
   val wDmg    = ref[DamageType](Physical())
@@ -171,9 +170,10 @@ def parseMap(text: String): GameMap / { ParseError } = {
   var builtTiles: List[List[Tile]] = Nil()
   var mapW: Int = 0
   var mapH: Int = 0
-
+  // store existing unit symbols and psotions to prevent overlap
   val usedSymbols = ref[List[String]](Nil())
   val usedPos     = ref[List[(Int, Int)]](Nil())
+
   lines.foreach { line =>
     if (failed.get()) {
       ()
@@ -183,7 +183,7 @@ def parseMap(text: String): GameMap / { ParseError } = {
           case Cons(h, _) => h
           case Nil()      => ""
         }
-
+      // flags for tags
       val trimmed = cleanedLine.trim()
       val mapRootOpen  = trimmed == "<Map>"
       val mapRootClose = trimmed == "</Map>"
@@ -286,7 +286,7 @@ def parseMap(text: String): GameMap / { ParseError } = {
           
           openTag(tagStack, "unit")
 
-
+          //aplly defaults
           curSide.set("player")
           curX.set(0); curY.set(0)
           curHP.set(1); curStrength.set(1); curMagic.set(1)
@@ -354,7 +354,7 @@ def parseMap(text: String): GameMap / { ParseError } = {
             if (not(failed.get())) {
               usedPos.set(Cons((fx, fy), usedPos.get()))
               usedSymbols.set(Cons(curSymbol.get(), usedSymbols.get()))
-
+              //create unit with values
               units.set(
                 Cons(
                   gameUnbit(
@@ -409,7 +409,7 @@ def parseMap(text: String): GameMap / { ParseError } = {
           } else {
             readingWeapon.set(true)
             openTag(tagStack, "weapon")
-
+            //defaults
             wName.set("No_Name_Set")
             wType.set(Axe())
             wDmg.set(Physical())
@@ -432,7 +432,7 @@ def parseMap(text: String): GameMap / { ParseError } = {
           } else {
             readingWeapon.set(false)
             closeTag(tagStack, "weapon")
-
+          //create wepaon
           weapons.set(
             Cons(
               Weapon(
@@ -451,7 +451,7 @@ def parseMap(text: String): GameMap / { ParseError } = {
           )
           }
         }
-
+        //reading wepaon values
         else if (readingWeapon.get()) {
           val n = between(trimmed, "<name>", "</name>")
           if (n.length() > 0) wName.set(n)
@@ -487,7 +487,7 @@ def parseMap(text: String): GameMap / { ParseError } = {
           }
         }
 
-        // ----- unit fields -----
+        //reading unit values
         else {
           val side = between(trimmed, "<side>", "</side>")
           if (side.length() > 0) curSide.set(side)

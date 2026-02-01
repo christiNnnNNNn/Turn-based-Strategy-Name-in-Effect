@@ -19,6 +19,7 @@ def listGet[A](xs: List[A], i: Int): Option[A] =
       else listGet(rest, i - 1)
   }
 
+//get a tile
 def tileAt(map: GameMap, x: Int, y: Int): Tile =
   listGet(map.tiles, y) match {
     case None() =>
@@ -55,6 +56,7 @@ def terrainPassableForFoot(t: Tile): Bool =
     case _          => true
   }
  
+// resolves if a unit can enter a tile
 def tryMove(
   x: Int,
   y: Int,
@@ -67,6 +69,7 @@ def tryMove(
   }
 }
 
+// can a tile be enteres
 def isReachable(x: Int, y: Int, rs: List[TilePos]): Bool =
   rs match {
     case Nil() => false
@@ -75,6 +78,7 @@ def isReachable(x: Int, y: Int, rs: List[TilePos]): Bool =
       else isReachable(x, y, rest)
   }
 
+//for clating optimal paht sof movment
 def betterSeen(
   seen: List[(TilePos, Int)],
   x: Int,
@@ -90,6 +94,7 @@ def betterSeen(
         betterSeen(rest, x, y, remaining)
   }
 
+//for the movment algorithm
 def updateSeen(
   seen: List[(TilePos, Int)],
   x: Int,
@@ -110,6 +115,7 @@ def updateSeen(
         Cons((TilePos(px, py), r), updateSeen(rest, x, y, remaining))
   }
 
+//neigboring tiles of a unit for the alögorithm
 def neighbors(r: Reach): List[Reach] =
   Cons(Reach(r.x + 1, r.y, r.remaining),
   Cons(Reach(r.x - 1, r.y, r.remaining),
@@ -117,6 +123,7 @@ def neighbors(r: Reach): List[Reach] =
   Cons(Reach(r.x, r.y - 1, r.remaining),
        Nil()))))
 
+// reslves the core algorithm for displaying possible movment
 def expand(
   frontier: List[Reach],
   seen: List[(TilePos, Int)],
@@ -167,6 +174,7 @@ def expand(
     }
   }
 
+//handler for class movment rules
 def withUnitMovementRules[R](
   map: GameMap,
   u: gameUnbit,
@@ -241,6 +249,7 @@ def withGroundMovement(map: GameMap, u: gameUnbit): List[TilePos] =
     reachableTiles(u.x, u.y, u.movement)
   }
 
+//gives back a unit at a certain position
 def unitAt(
   units: List[gameUnbit],
   x: Int,
@@ -257,6 +266,7 @@ def unitAt(
         unitAt(rest, x, y)
   }
 
+//for displaying possible movment
 def reachableTiles(
   x: Int,
   y: Int,
@@ -267,6 +277,6 @@ def reachableTiles(
     Nil(),
     Nil()
   )
-
+//mahtten distance for the movment algorithm
 def manhattan(x1: Int, y1: Int, x2: Int, y2: Int): Int =
   abs(x1 - x2) + abs(y1 - y2)

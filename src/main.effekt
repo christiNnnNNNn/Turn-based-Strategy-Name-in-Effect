@@ -10,7 +10,7 @@ import src/utils
 import src/gamestate
 
 def main() = {
-  val text = readFile("C:/Users/Christian/Documents/testMap.txt")
+  val text = readFile("./testMap.txt")
   val map =
   try { parseMap(text) }
   with ParseError { (msg) =>

@@ -1,0 +1,488 @@
+<Map>
+  <map>
+    ffffffffffwwwfffffffxx/
+    fftttfffffwwwffhhffff/
+    fftttffsfffwffhhfffff/
+    ffffffssfffwffffffffff/
+    fffwwwfffffwfffftfffff/
+    fffwmmfffffwwfffttffff/
+    fffwmmfffffwwffffffffff/
+    fffwwwffhhhwwffffssffff/
+    ffffffffhhhwwffffssffff/
+    fffffffffffwwffffffffff/
+    ffftttffffffwfffffmmffff/
+    ffftttffffffffffffmmffff/
+    ffffffffffffffffffffffff/
+    fffffhhffffffwffffttffff/
+    fffffhhffffffwffffttffff/
+  </map>
+
+  <units>
+
+    <!-- ===== PLAYER / ALLIES ===== -->
+
+    <unit>
+      <side>player</side>
+      <symbol>A</symbol>
+      <class>soldier</class>
+      <x>2</x>
+      <y>14</y>
+
+      <hp>hallo</hp>
+      <strength>8</strength>
+      <magic>2</magic>
+      <defense>6</defense>
+      <resistance>2</resistance>
+      <precision>7</precision>
+      <agility>5</agility>
+      <luck>4</luck>
+      <movement>5</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Iron Sword</name>
+          <kind>sword</kind>
+          <damageType>physical</damageType>
+          <attack>6</attack>
+          <hit>85</hit>
+          <uses>45</uses>
+          <crit>5</crit>
+          <range>1,1</range>
+          <modifiers>
+            <modifier>none</modifier>
+          </modifiers>
+        </weapon>
+
+        <weapon>
+          <name>Armor Splitter</name>
+          <kind>sword</kind>
+          <damageType>physical</damageType>
+          <attack>5</attack>
+          <hit>80</hit>
+          <uses>25</uses>
+          <crit>0</crit>
+          <range>1,1</range>
+          <modifiers>
+            <modifier>armor_break</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>player</side>
+      <symbol>B</symbol>
+      <class>knight</class>
+      <x>4</x>
+      <y>13</y>
+
+      <hp>34</hp>
+      <strength>10</strength>
+      <magic>0</magic>
+      <defense>9</defense>
+      <resistance>2</resistance>
+      <precision>6</precision>
+      <agility>3</agility>
+      <luck>2</luck>
+      <movement>4</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Steel Lance</name>
+          <kind>lance</kind>
+          <damageType>physical</damageType>
+          <attack>9</attack>
+          <hit>70</hit>
+          <uses>30</uses>
+          <crit>3</crit>
+          <range>1,1</range>
+          <modifiers>
+            <modifier>armor_break</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>player</side>
+      <symbol>C</symbol>
+      <class>armor</class>
+      <x>6</x>
+      <y>14</y>
+
+      <hp>40</hp>
+      <strength>9</strength>
+      <magic>0</magic>
+      <defense>12</defense>
+      <resistance>3</resistance>
+      <precision>5</precision>
+      <agility>2</agility>
+      <luck>1</luck>
+      <movement>3</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Iron Axe</name>
+          <kind>axe</kind>
+          <damageType>physical</damageType>
+          <attack>8</attack>
+          <hit>70</hit>
+          <uses>40</uses>
+          <crit>0</crit>
+          <range>1,1</range>
+          <modifiers>
+            <modifier>none</modifier>
+          </modifiers>
+        </weapon>
+
+        <weapon>
+          <name>Breaker Axe</name>
+          <kind>axe</kind>
+          <damageType>physical</damageType>
+          <attack>7</attack>
+          <hit>65</hit>
+          <uses>25</uses>
+          <crit>5</crit>
+          <range>1,1</range>
+          <modifiers>
+            <modifier>armor_break</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>player</side>
+      <symbol>D</symbol>
+      <class>flyer</class>
+      <x>9</x>
+      <y>13</y>
+
+      <hp>26</hp>
+      <strength>7</strength>
+      <magic>1</magic>
+      <defense>5</defense>
+      <resistance>4</resistance>
+      <precision>8</precision>
+      <agility>7</agility>
+      <luck>5</luck>
+      <movement>7</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Javelin</name>
+          <kind>lance</kind>
+          <damageType>physical</damageType>
+          <attack>6</attack>
+          <hit>75</hit>
+          <uses>25</uses>
+          <crit>0</crit>
+          <range>1,2</range>
+          <modifiers>
+            <modifier>none</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>player</side>
+      <symbol>E</symbol>
+      <class>soldier</class>
+      <x>11</x>
+      <y>14</y>
+
+      <hp>24</hp>
+      <strength>3</strength>
+      <magic>7</magic>
+      <defense>3</defense>
+      <resistance>6</resistance>
+      <precision>7</precision>
+      <agility>5</agility>
+      <luck>4</luck>
+      <movement>5</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Fire Tome</name>
+          <kind>tome</kind>
+          <damageType>magic</damageType>
+          <attack>7</attack>
+          <hit>85</hit>
+          <uses>30</uses>
+          <crit>0</crit>
+          <range>1,2</range>
+          <modifiers>
+            <modifier>none</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>player</side>
+      <symbol>F</symbol>
+      <class>soldier</class>
+      <x>15</x>
+      <y>15</y>
+
+      <hp>100</hp>
+      <strength>6</strength>
+      <magic>0</magic>
+      <defense>4</defense>
+      <resistance>2</resistance>
+      <precision>9</precision>
+      <agility>6</agility>
+      <luck>3</luck>
+      <movement>5</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Longbow</name>
+          <kind>bow</kind>
+          <damageType>physical</damageType>
+          <attack>6</attack>
+          <hit>80</hit>
+          <uses>35</uses>
+          <crit>5</crit>
+          <range>2,3</range>
+          <modifiers>
+            <modifier>none</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+
+    <!-- ===== ENEMIES ===== -->
+
+    <unit>
+      <side>enemy</side>
+      <symbol>1</symbol>
+      <class>soldier</class>
+      <x>18</x>
+      <y>3</y>
+
+      <hp>22</hp>
+      <strength>6</strength>
+      <magic>0</magic>
+      <defense>4</defense>
+      <resistance>2</resistance>
+      <precision>6</precision>
+      <agility>4</agility>
+      <luck>2</luck>
+      <movement>5</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Iron Axe</name>
+          <kind>axe</kind>
+          <damageType>physical</damageType>
+          <attack>7</attack>
+          <hit>70</hit>
+          <uses>40</uses>
+          <crit>0</crit>
+          <range>1,1</range>
+          <modifiers>
+            <modifier>none</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>enemy</side>
+      <symbol>2</symbol>
+      <class>armor</class>
+      <x>20</x>
+      <y>5</y>
+
+      <hp>38</hp>
+      <strength>8</strength>
+      <magic>0</magic>
+      <defense>11</defense>
+      <resistance>2</resistance>
+      <precision>5</precision>
+      <agility>2</agility>
+      <luck>1</luck>
+      <movement>3</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Steel Lance</name>
+          <kind>lance</kind>
+          <damageType>physical</damageType>
+          <attack>9</attack>
+          <hit>65</hit>
+          <uses>25</uses>
+          <crit>0</crit>
+          <range>1,1</range>
+          <modifiers>
+            <modifier>armor_break</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>enemy</side>
+      <symbol>3</symbol>
+      <class>knight</class>
+      <x>16</x>
+      <y>7</y>
+
+      <hp>28</hp>
+      <strength>9</strength>
+      <magic>0</magic>
+      <defense>7</defense>
+      <resistance>2</resistance>
+      <precision>6</precision>
+      <agility>3</agility>
+      <luck>2</luck>
+      <movement>4</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Killer Sword</name>
+          <kind>sword</kind>
+          <damageType>physical</damageType>
+          <attack>7</attack>
+          <hit>80</hit>
+          <uses>20</uses>
+          <crit>20</crit>
+          <range>1,1</range>
+          <modifiers>
+            <modifier>none</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>enemy</side>
+      <symbol>4</symbol>
+      <class>flyer</class>
+      <x>21</x>
+      <y>9</y>
+
+      <hp>24</hp>
+      <strength>7</strength>
+      <magic>0</magic>
+      <defense>5</defense>
+      <resistance>4</resistance>
+      <precision>7</precision>
+      <agility>7</agility>
+      <luck>4</luck>
+      <movement>7</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Javelin</name>
+          <kind>lance</kind>
+          <damageType>physical</damageType>
+          <attack>6</attack>
+          <hit>75</hit>
+          <uses>25</uses>
+          <crit>0</crit>
+          <range>1,2</range>
+          <modifiers>
+            <modifier>none</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>enemy</side>
+      <symbol>5</symbol>
+      <class>soldier</class>
+      <x>19</x>
+      <y>11</y>
+
+      <hp>20</hp>
+      <strength>3</strength>
+      <magic>6</magic>
+      <defense>3</defense>
+      <resistance>6</resistance>
+      <precision>7</precision>
+      <agility>4</agility>
+      <luck>3</luck>
+      <movement>5</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Fire Tome</name>
+          <kind>tome</kind>
+          <damageType>magic</damageType>
+          <attack>6</attack>
+          <hit>85</hit>
+          <uses>25</uses>
+          <crit>0</crit>
+          <range>1,2</range>
+          <modifiers>
+            <modifier>none</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>enemy</side>
+      <symbol>6</symbol>
+      <class>soldier</class>
+      <x>22</x>
+      <y>13</y>
+
+      <hp>22</hp>
+      <strength>6</strength>
+      <magic>0</magic>
+      <defense>4</defense>
+      <resistance>2</resistance>
+      <precision>8</precision>
+      <agility>5</agility>
+      <luck>2</luck>
+      <movement>5</movement>
+
+      <activeWeapon>0</activeWeapon>
+
+      <weapons>
+        <weapon>
+          <name>Enemy Bow</name>
+          <kind>bow</kind>
+          <damageType>physical</damageType>
+          <attack>6</attack>
+          <hit>75</hit>
+          <uses>30</uses>
+          <crit>5</crit>
+          <range>2,3</range>
+          <modifiers>
+            <modifier>none</modifier>
+          </modifiers>
+        </weapon>
+      </weapons>
+    </unit>
+
+  </units>
+</Map>

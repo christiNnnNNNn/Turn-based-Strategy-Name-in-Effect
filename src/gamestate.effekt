@@ -5,6 +5,7 @@ import src/movement
 import src/utils
 import src/weaponhandling
 
+//Datatype used to redirect diffrent atcion types in the Ui
 type UIAction {
   Quit()
   SelectUnit(x: Int, y: Int)
@@ -20,6 +21,7 @@ type UIAction {
   Help()     
   }
 
+//reslves how currently attaking and being attacked
 record CombatState(
   attacker: gameUnbit,
   attackerStartX: Int,
@@ -32,6 +34,7 @@ record CombatState(
   preview: CombatPreview
 )
 
+// reslves which unit is currently moving
 type MoveState {
   Moving(
     unit: gameUnbit,
@@ -43,6 +46,7 @@ type MoveState {
   )
 }
 
+//replces Unit with another one used to apply stat changes
 def replaceUnit(
   units: List[gameUnbit],
   oldX: Int,
@@ -59,6 +63,7 @@ def replaceUnit(
         Cons(u, replaceUnit(rest, oldX, oldY, updated))
   }
 
+//resets unit to orignal psoition away form the cursor
 def resetMoved(units: List[gameUnbit]): List[gameUnbit] =
   units match {
     case Nil() => Nil()
@@ -83,6 +88,7 @@ def effectivePosition(
       }
   }
 
+//used by AI to find the nearest apyler to attack
 def nearestPlayer(enemy: gameUnbit, units: List[gameUnbit]): Option[gameUnbit] = {
   def loop(
     xs: List[gameUnbit],
@@ -109,6 +115,7 @@ def nearestPlayer(enemy: gameUnbit, units: List[gameUnbit]): Option[gameUnbit] =
   loop(units, None(), 999999)
 }
 
+// resolves attack with roll effekt
 def resolveAttackPure(att: gameUnbit, deff: gameUnbit, p: CombatPreview): AttackResult / {} =
   try { resolveAttack(att, deff, p) }
   with roll { max =>
@@ -116,6 +123,7 @@ def resolveAttackPure(att: gameUnbit, deff: gameUnbit, p: CombatPreview): Attack
     resume(randInt(m))
   }
 
+//calcaltes best traget for the reahc of the enemy unit
 def bestReachForRange(
   reach: List[TilePos],
   tx: Int, ty: Int,
@@ -151,6 +159,7 @@ def bestReachForRange(
 
   loop(reach, None(), 999999, 999999)
 }
+//resolves victory conditions
 def endOrContinue(map: GameMap) { next: GameMap => Unit }: Unit =
   val m = cleanupMap(map)
   val pAlive = sideHasUnits(m.units, "player")
@@ -160,8 +169,8 @@ def endOrContinue(map: GameMap) { next: GameMap => Unit }: Unit =
   else if (pAlive) { printString("\n*** YOU WIN! ***\n"); () }
   else { printString("\n*** YOU LOSE! ***\n"); () }
 
-
- def canCounter(
+//check if defending unti is reahc to counter attack
+def canCounter(
   defU: gameUnbit,
   attU: gameUnbit,
   wDef: Weapon
@@ -199,9 +208,11 @@ def removeDead(units: List[gameUnbit]): List[gameUnbit] =
       if (alive(u)) Cons(u, tail) else tail
   }
 
+//clenas all dead units
 def cleanupMap(m: GameMap): GameMap =
   GameMap(m.width, m.height, m.tiles, removeDead(m.units))
 
+//used for vitory conditions
 def sideHasUnits(units: List[gameUnbit], side: String): Bool =
   units match {
     case Nil() => false
@@ -210,7 +221,7 @@ def sideHasUnits(units: List[gameUnbit], side: String): Bool =
       else sideHasUnits(rest, side)
   }
 
-  def enemyPhase(map: GameMap): GameMap = {
+def enemyPhase(map: GameMap): GameMap = {
 
   def onlyPlayers(xs: List[gameUnbit]): List[gameUnbit] =
     xs match {
