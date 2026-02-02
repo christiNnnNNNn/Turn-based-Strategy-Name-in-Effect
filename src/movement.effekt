@@ -56,7 +56,7 @@ def terrainPassableForFoot(t: Tile): Bool =
     case _          => true
   }
  
-// resolves if a unit can enter a tile
+// resolves if a unit can enter a tile and the mvoment cost
 def tryMove(
   x: Int,
   y: Int,
@@ -69,7 +69,7 @@ def tryMove(
   }
 }
 
-// can a tile be enteres
+// can a tile be enterd
 def isReachable(x: Int, y: Int, rs: List[TilePos]): Bool =
   rs match {
     case Nil() => false
@@ -78,7 +78,7 @@ def isReachable(x: Int, y: Int, rs: List[TilePos]): Bool =
       else isReachable(x, y, rest)
   }
 
-//for clating optimal paht sof movment
+//for claculating optimal path of movment
 def betterSeen(
   seen: List[(TilePos, Int)],
   x: Int,
@@ -94,7 +94,7 @@ def betterSeen(
         betterSeen(rest, x, y, remaining)
   }
 
-//for the movment algorithm
+//for the movemnt algorithm
 def updateSeen(
   seen: List[(TilePos, Int)],
   x: Int,

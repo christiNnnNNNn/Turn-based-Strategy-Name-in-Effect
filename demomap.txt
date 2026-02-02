@@ -1,0 +1,61 @@
+<Map>
+  <map>
+    fffff/
+    fwwff/
+    fftff/
+    ffwwf/
+    fffff/
+  </map>
+
+  <units>
+    <unit>
+      <side>player</side>
+      <symbol>A</symbol>
+      <class>soldier</class>
+      <x>2</x>
+      <y>3</y>
+      <hp>14</hp>
+      <strength>4</strength>
+      <defense>1</defense>
+      <movement>4</movement>
+
+      <weapons>
+        <weapon>
+          <name>Iron Sword</name>
+          <kind>sword</kind>
+          <damageType>physical</damageType>
+          <attack>4</attack>
+          <hit>85</hit>
+          <uses>10</uses>
+          <crit>5</crit>
+          <range>1</range>
+        </weapon>
+      </weapons>
+    </unit>
+
+    <unit>
+      <side>enemy</side>
+      <symbol>E</symbol>
+      <class>soldier</class>
+      <x>5</x>
+      <y>3</y>
+      <hp>11</hp>
+      <strength>3</strength>
+      <defense>1</defense>
+      <movement>2</movement>
+
+      <weapons>
+        <weapon>
+          <name>Iron Sword</name>
+          <kind>sword</kind>
+          <damageType>physical</damageType>
+          <attack>3</attack>
+          <hit>75</hit>
+          <uses>10</uses>
+          <crit>0</crit>
+          <range>1</range>
+        </weapon>
+      </weapons>
+    </unit>
+  </units>
+</Map>

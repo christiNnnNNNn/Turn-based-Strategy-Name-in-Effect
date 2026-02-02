@@ -8,7 +8,6 @@ import src/movement
 import src/combat
 effect ParseError(msg: String): Unit
 
-
 def parseWeaponMod(s: String): WeaponMod =
   val t = s.trim()
   if (t == "none") NoneMod()
